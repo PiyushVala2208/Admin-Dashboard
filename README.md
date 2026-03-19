@@ -1,4 +1,4 @@
-# 🛡️ AdminCore Dashboard v1.0
+# 🛡️ AdminCore Dashboard
 
 A premium, high-performance **Full Stack Admin Panel** designed for modern enterprise management. Built with a focus on speed and scalability.
 ---
