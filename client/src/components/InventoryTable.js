@@ -11,7 +11,7 @@ export default function InventoryTable({
   const { currencySymbol } = useSettings();
 
   return (
-    <div className="hidden md:block bg-white shadow-xl shadow-slate-200/60 rounded-2xl border border-slate-100 overflow-hidden transition-all">
+    <div className="hidden md:block bg-white shadow-xl shadow-slate-200/60 rounded-2xl border border-slate-100 overflow-hidden transition-all min-h-[585px]">
       <table className="w-full text-sm text-left">
         <thead className="bg-slate-50 text-slate-600 border-b border-slate-100">
           <tr>
