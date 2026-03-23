@@ -56,7 +56,7 @@ npm run dev
   Timeline-based tracking of system actions
 
 * 📱 **Ultra Responsive Design**
-  Optimized for mobile, tablet, and large screens (4K support)
+  Optimized for mobile, tablet, and large screens
 
 ---
 
