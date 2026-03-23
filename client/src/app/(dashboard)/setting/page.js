@@ -11,8 +11,10 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import api from "@/app/utils/api";
+import { useSettings } from "@/context/SettingsContext";
 
 export default function SettingPage() {
+  const { updateSettings } = useSettings();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
@@ -71,8 +73,13 @@ export default function SettingPage() {
         email_notification: settings.emailNotification,
       };
 
-      await api.put("/users/settings", payload);
-      alert("Settings Synced to Cloud! 🚀");
+      const result = await updateSettings(payload);
+
+      if (result.success) {
+        alert("Settings Synced to Cloud! 🚀");
+      } else {
+        throw new Error("Update failed");
+      }
     } catch (err) {
       console.error("Error saving settings:", err);
       alert("Failed to save settings.");

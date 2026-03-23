@@ -114,7 +114,7 @@ export default function AddItemPage() {
             </div>
             <div className="group">
               <label className="text-sm font-semibold text-slate-700 mb-2 block group-focus-within:text-blue-600 transition-colors">
-                Price (₹)
+                Price
               </label>
               <input
                 type="number"

@@ -50,13 +50,29 @@ export const SettingsProvider = ({ children }) => {
     }
   };
 
+  const updateSettings = async (newSettings) => {
+    try {
+      const res = await api.put("/users/settings", newSettings);
+      if (res.status === 200) {
+        setSettings((prev) => ({
+          ...prev,
+          ...newSettings,
+        }));
+        return { success: true };
+      }
+    } catch (err) {
+      console.error("Update Settings Error:", err);
+      return { success: false, error: err };
+    }
+  };
+
   useEffect(() => {
     const token = getCookie("token");
-    
+
     if (token) {
       fetchSettings();
     } else {
-      setLoading(false); 
+      setLoading(false);
       console.log("No token found, skipping settings fetch on this page.");
     }
   }, []);
@@ -65,7 +81,14 @@ export const SettingsProvider = ({ children }) => {
 
   return (
     <SettingsContext.Provider
-      value={{ settings, setSettings, currencySymbol, fetchSettings, loading }}
+      value={{
+        settings,
+        setSettings,
+        currencySymbol,
+        fetchSettings,
+        loading,
+        updateSettings,
+      }}
     >
       {children}
     </SettingsContext.Provider>
