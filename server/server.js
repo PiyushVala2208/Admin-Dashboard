@@ -25,6 +25,14 @@ app.use("/api/auth", authRoute);
 app.use("/api/users", userRoute);
 app.use("/api/inventory", inventoryRoute);
 
+app.use((err, req, res, next) => {
+  const status = err.statusCode || 500;
+  res.status(status).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });

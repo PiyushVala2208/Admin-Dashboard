@@ -11,8 +11,15 @@ const User = {
 
   create: async (name, email, hashedPassword) => {
     const result = await pool.query(
-      "INSERT INTO users (name, email, password, role, status) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role, status",
-      [name, email, hashedPassword, "Admin", "Active"],
+      "INSERT INTO users (name, email, password, role, status, profile_pic) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, email, role, status, profile_pic",
+      [
+        name,
+        email,
+        hashedPassword,
+        "Admin",
+        "Active",
+        defaultPic
+      ],
     );
     return result.rows[0];
   },

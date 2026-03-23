@@ -126,7 +126,7 @@ export default function SettingPage() {
                 name="companyName"
                 value={settings.companyName}
                 onChange={handleChange}
-                placeholder="e.g. Radhe Publicity"
+                placeholder="your company name"
                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-medium"
               />
             </div>
@@ -139,7 +139,7 @@ export default function SettingPage() {
                 name="companyEmail"
                 value={settings.companyEmail}
                 onChange={handleChange}
-                placeholder="contact@company.com"
+                placeholder="comapany email address"
                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-medium"
               />
             </div>

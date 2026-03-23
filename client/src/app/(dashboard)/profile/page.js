@@ -17,7 +17,10 @@ export default function ProfilePage() {
     profile_pic: null,
   });
 
-  const BACKEND_URL = "http://localhost:8000";
+  const BACKEND_URL =
+    process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
+    "http://localhost:8000";
+  const DEFAULT_IMAGE = `${BACKEND_URL}/uploads/profiles/default.png`;
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
@@ -25,6 +28,12 @@ export default function ProfilePage() {
       setProfile(JSON.parse(savedUser));
     }
   }, []);
+
+  const getProfileSrc = () => {
+    if (!profile.profile_pic) return DEFAULT_IMAGE;
+    if (profile.profile_pic.startsWith("http")) return profile.profile_pic;
+    return `${BACKEND_URL}${profile.profile_pic}`;
+  };
 
   const handleImageClick = () => {
     fileInputRef.current.click();
@@ -142,11 +151,7 @@ export default function ProfilePage() {
               className="w-32 h-32 sm:w-40 sm:h-40 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden cursor-pointer border-4 border-white shadow-xl transition-all hover:ring-8 hover:ring-blue-50 active:scale-95"
             >
               <img
-                src={
-                  profile.profile_pic
-                    ? `${BACKEND_URL}${profile.profile_pic}`
-                    : `${BACKEND_URL}/uploads/profiles/default.png`
-                }
+                src={getProfileSrc()}
                 alt="Profile"
                 className="w-full h-full object-cover"
                 onError={(e) => {

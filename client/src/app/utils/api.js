@@ -2,82 +2,69 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api",
-  timeout: 15000, 
+  timeout: 15000,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-const getCookie = (name) => {
-  if (typeof document === "undefined") return null;
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(";").shift();
-  return null;
+const getAuthToken = () => {
+  if (typeof window === "undefined") return null;
+
+  const name = "token=";
+  const decodedCookie = decodeURIComponent(document.cookie);
+  const ca = decodedCookie.split(";");
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i].trim();
+    if (c.indexOf(name) === 0) return c.substring(name.length, c.length);
+  }
+
+  return localStorage.getItem("token");
 };
 
 api.interceptors.request.use(
   (config) => {
-    const token = getCookie("token");
+    const token = getAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error),
 );
 
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
-    const { response, request } = error;
+    const { response } = error;
 
     if (response) {
       const status = response.status;
+      const message = response.data?.message || "An unexpected error occurred.";
 
-      switch (status) {
-        case 401:
-          const isLoginPage = typeof window !== "undefined" && window.location.pathname === "/login";
-          if (!isLoginPage) {
-            document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      if (status === 401) {
+        if (typeof window !== "undefined") {
+          const path = window.location.pathname;
+
+          if (path !== "/login" && path !== "/signup") {
+            document.cookie =
+              "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+            localStorage.removeItem("token");
             localStorage.removeItem("user");
-            if (typeof window !== "undefined") {
-              window.location.href = "/login";
-            }
+
+            window.location.href = "/login";
           }
-          break;
-
-        case 403:
-          console.error("Access Forbidden: You do not have permission for this action.");
-          break;
-
-        case 404:
-          console.error("Resource Not Found: The requested endpoint does not exist.");
-          break;
-
-        case 500:
-          console.error("Internal Server Error: Something went wrong on the server.");
-          break;
-
-        default:
-          console.error(`API Error (${status}):`, response.data?.message || "An unexpected error occurred.");
+        }
       }
-    } else if (request) {
-      if (error.code === 'ECONNABORTED') {
-        console.error("Request Timeout: The server is taking too long to respond.");
-      } else {
-        console.error("Network Error: Please check your internet connection or backend server status.");
-      }
-    } else {
-      console.error("Configuration Error:", error.message);
+
+      console.error(`[API Error ${status}]:`, message);
+
+      return Promise.reject(response.data);
     }
 
-    return Promise.reject(error);
-  }
+    console.error("Network Error: Backend unreachable.");
+    return Promise.reject({ message: "Network error, check your server." });
+  },
 );
 
 export default api;

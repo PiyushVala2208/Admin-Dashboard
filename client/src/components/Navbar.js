@@ -12,7 +12,10 @@ export default function Navbar() {
   });
   const dropdownRef = useRef(null);
 
-  const BACKEND_URL = "http://localhost:8000";
+  const BACKEND_URL =
+    process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
+    "http://localhost:8000";
+  const DEFAULT_IMAGE = `${BACKEND_URL}/uploads/profiles/default.png`;
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
@@ -28,7 +31,8 @@ export default function Navbar() {
   const handleLogout = async () => {
     if (!confirm("Are you sure you want to logout?")) return;
     try {
-      document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+      document.cookie =
+        "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
       localStorage.clear();
       window.location.replace("/login");
     } catch (error) {
@@ -46,11 +50,22 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const getProfileSrc = () => {
+    if (!userData.profile_pic) return DEFAULT_IMAGE;
+
+    if (userData.profile_pic.startsWith("http")) return userData.profile_pic;
+
+    return `${BACKEND_URL}${userData.profile_pic}`;
+  };
+
   return (
     <nav className="flex items-center justify-between top-0 z-40 h-16 md:h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 md:px-8 sticky">
       <div className="flex-1"></div>
 
-      <div ref={dropdownRef} className="relative flex items-center gap-3 md:gap-5">
+      <div
+        ref={dropdownRef}
+        className="relative flex items-center gap-3 md:gap-5"
+      >
         <div className="hidden sm:flex flex-col items-right text-right border-l border-slate-200 pl-4 md:pl-6">
           <p className="text-sm font-bold text-slate-800 truncate max-w-[150px]">
             {userData.name}
@@ -66,25 +81,25 @@ export default function Navbar() {
             className="w-9 h-9 md:w-11 md:h-11 flex items-center justify-center rounded-full bg-slate-100 cursor-pointer border border-slate-200 hover:border-blue-400 hover:ring-4 hover:ring-blue-50 transition-all duration-300 overflow-hidden"
           >
             <img
-              src={userData.profile_pic 
-                ? `${BACKEND_URL}${userData.profile_pic}` 
-                : `${BACKEND_URL}/uploads/profiles/default.png`
-              }
+              src={getProfileSrc()}
               alt="Profile"
               className="w-full h-full object-cover"
               onError={(e) => {
                 e.target.onerror = null;
-                e.target.src = `${BACKEND_URL}/uploads/profiles/default.png`;
+                e.target.src = DEFAULT_IMAGE;
               }}
             />
           </button>
 
           {isOpen && (
             <div className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] border border-slate-200 p-2 animate-in fade-in zoom-in duration-200 z-50 origin-top-right">
-              
               <div className="sm:hidden px-4 py-3 border-b border-slate-100 mb-1">
-                <p className="text-sm font-bold text-slate-900">{userData.name}</p>
-                <p className="text-xs text-slate-500 truncate">{userData.email}</p>
+                <p className="text-sm font-bold text-slate-900">
+                  {userData.name}
+                </p>
+                <p className="text-xs text-slate-500 truncate">
+                  {userData.email}
+                </p>
               </div>
 
               <Link
