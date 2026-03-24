@@ -1,9 +1,19 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Pencil, Search, Trash2, Users2, Plus, Loader2 } from "lucide-react";
+import {
+  Search,
+  Users2,
+  Plus,
+  Mail,
+  ShieldCheck,
+  UserCircle,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import api from "@/app/utils/api";
+import UserTable from "@/components/UserTable";
+import UserSidebarFilter from "@/components/UserSidebarFilter";
 import EditUserModal from "@/components/EditUserModal";
+import Pagination from "@/components/Pagination";
 
 export default function AllUserPage() {
   const router = useRouter();
@@ -12,6 +22,15 @@ export default function AllUserPage() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(8);
+  const [activeFilters, setActiveFilters] = useState({
+    category: [],
+    roles: [],
+    criticalOnly: false,
+    inactiveOnly: false,
+  });
 
   const fetchUsers = async () => {
     try {
@@ -28,11 +47,26 @@ export default function AllUserPage() {
     fetchUsers();
   }, []);
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.name.toLowerCase().includes(search.toLowerCase()) ||
-      user.email.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filteredUsers = (users || []).filter((user) => {
+    const matchesSearch =
+      (user.name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (user.email || "").toLowerCase().includes(search.toLowerCase());
+
+    const matchesRole =
+      activeFilters.roles.length === 0 ||
+      activeFilters.roles.includes(user.role);
+
+    const matchesStatus = activeFilters.inactiveOnly
+      ? user.status?.toLowerCase() === "inactive"
+      : true;
+
+    return matchesSearch && matchesRole && matchesStatus;
+  });
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
 
   const handleDelete = async (e, id) => {
     e.stopPropagation();
@@ -56,189 +90,199 @@ export default function AllUserPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
-        <p className="font-bold text-slate-600">Loading Users...</p>
+        <p className="font-bold text-slate-600 animate-pulse">
+          Loading System Users...
+        </p>
       </div>
     );
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto animate-in fade-in duration-500">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-3 text-slate-800">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Users2 size={24} className="text-blue-600" />
-            </div>
+    <div className="p-4 sm:p-6 lg:p-10 max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-bold uppercase tracking-wider mb-2">
+            <ShieldCheck size={14} /> Admin Control Panel
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight flex items-center gap-3">
             System Users
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
-            Manage user accounts and permissions
+          <p className="text-slate-500 font-medium">
+            Manage permissions, roles, and account status for all staff.
           </p>
         </div>
         <button
           onClick={() => router.push("/users/add")}
-          className="flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-all font-semibold shadow-lg shadow-blue-200 active:scale-95 w-full sm:w-auto"
+          className="group flex items-center justify-center gap-2 bg-slate-900 text-white px-8 py-4 rounded-2xl hover:bg-blue-600 transition-all duration-300 font-bold shadow-xl shadow-slate-200 active:scale-95 w-full md:w-auto"
         >
-          <Plus size={20} /> Add New User
+          <Plus
+            size={20}
+            className="group-hover:rotate-90 transition-transform duration-300"
+          />
+          Add New User
         </button>
       </div>
 
-      <div className="relative mb-6 group max-w-md">
-        <Search
-          size={18}
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors"
-        />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name or email..."
-          className="w-full bg-white border border-slate-200 pl-11 pr-4 rounded-xl py-3 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all shadow-sm"
-        />
-      </div>
-
-      <div className="hidden md:block bg-white shadow-xl shadow-slate-200/60 rounded-2xl border border-slate-100 overflow-hidden">
-        <table className="w-full text-sm text-left">
-          <thead className="bg-slate-50 text-slate-600 border-b border-slate-100">
-            <tr>
-              <th className="p-4 font-semibold uppercase tracking-wider">
-                User Details
-              </th>
-              <th className="p-4 font-semibold uppercase tracking-wider">
-                Role
-              </th>
-              <th className="p-4 font-semibold uppercase tracking-wider">
-                Status
-              </th>
-              <th className="p-4 font-semibold uppercase tracking-wider text-center">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filteredUsers.map((user) => (
-              <tr
-                key={user.id}
-                onClick={() => router.push(`/users/info/${user.id}`)}
-                className="hover:bg-blue-50/50 cursor-pointer transition-colors group"
-              >
-                <td className="p-4">
-                  <div className="flex flex-col">
-                    <span className="font-bold text-slate-700">
-                      {user.name}
-                    </span>
-                    <span className="text-xs text-slate-400">{user.email}</span>
-                  </div>
-                </td>
-                <td className="p-4">
-                  <span
-                    className={`px-3 py-1 text-[11px] font-bold rounded-full border ${
-                      user.role === "Admin"
-                        ? "bg-purple-50 text-purple-700 border-purple-100"
-                        : user.role === "Manager"
-                          ? "bg-amber-50 text-amber-700 border-amber-100"
-                          : "bg-blue-50 text-blue-700 border-blue-100"
-                    }`}
-                  >
-                    {user.role?.toUpperCase()}
-                  </span>
-                </td>
-                <td className="p-4">
-                  <span
-                    className={`px-3 py-1 text-[11px] font-bold rounded-full border ${
-                      user.status === "Active"
-                        ? "bg-green-50 text-green-700 border-green-100"
-                        : "bg-slate-50 text-slate-500 border-slate-200"
-                    }`}
-                  >
-                    {user.status?.toUpperCase() || "ACTIVE"}
-                  </span>
-                </td>
-                <td className="p-4">
-                  <div className="flex justify-center gap-2">
-                    <button
-                      onClick={(e) => handleEdit(e, user)}
-                      className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                    >
-                      <Pencil size={18} />
-                    </button>
-                    <button
-                      onClick={(e) => handleDelete(e, user.id)}
-                      className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="md:hidden space-y-4">
-        {filteredUsers.map((user) => (
-          <div
-            key={user.id}
-            onClick={() => router.push(`/users/info/${user.id}`)}
-            className="bg-white p-5 rounded-2xl border border-slate-100 shadow-md active:scale-[0.98] transition-transform"
-          >
-            <div className="flex justify-between items-start mb-3">
-              <div>
-                <h3 className="font-bold text-slate-800 text-lg leading-tight">
-                  {user.name}
-                </h3>
-                <p className="text-slate-500 text-xs">{user.email}</p>
-              </div>
-              <span
-                className={`px-2 py-1 text-[10px] font-black rounded-md border ${
-                  user.role === "Admin"
-                    ? "bg-purple-50 text-purple-700 border-purple-100"
-                    : "bg-blue-50 text-blue-700 border-blue-100"
-                }`}
-              >
-                {user.role?.toUpperCase()}
-              </span>
-            </div>
-
-            <div className="flex justify-between items-end mt-4">
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-                  Status
-                </span>
-                <span className="text-sm font-bold text-green-600">
-                  {user.status || "Active"}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={(e) => handleEdit(e, user)}
-                  className="p-3 bg-blue-50 text-blue-600 rounded-xl"
-                >
-                  <Pencil size={20} />
-                </button>
-                <button
-                  onClick={(e) => handleDelete(e, user.id)}
-                  className="p-3 bg-red-50 text-red-600 rounded-xl"
-                >
-                  <Trash2 size={20} />
-                </button>
-              </div>
-            </div>
+      <div className="flex flex-col lg:flex-row gap-10">
+        <div className="lg:w-72 shrink-0">
+          <div className="sticky top-8">
+            <UserSidebarFilter
+              activeFilters={activeFilters}
+              setActiveFilters={setActiveFilters}
+            />
           </div>
-        ))}
-      </div>
-
-      {filteredUsers.length === 0 && (
-        <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 mt-6">
-          <Users2 className="mx-auto text-slate-300 mb-4" size={48} />
-          <p className="text-slate-500 font-medium">
-            {search
-              ? `No users found matching "${search}"`
-              : "No users in the system"}
-          </p>
         </div>
-      )}
+
+        <div className="flex-1 space-y-8">
+          <div className="relative group">
+            <Search
+              size={20}
+              className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors"
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search by name, email or role..."
+              className="w-full bg-white border-2 border-slate-100 pl-14 pr-6 rounded-2xl py-4 focus:outline-none focus:ring-8 focus:ring-blue-500/5 focus:border-blue-500 transition-all shadow-sm text-slate-700 font-medium placeholder:text-slate-400"
+            />
+          </div>
+
+          <div className="hidden xl:block">
+            {filteredUsers.length > 0 ? (
+              <UserTable
+                users={currentItems}
+                itemsPerPage={itemsPerPage}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                router={router}
+              />
+            ) : (
+              <div className="bg-white shadow-xl shadow-slate-200/60 rounded-2xl border border-slate-100 overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
+                        User Details
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
+                        Role
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td colSpan="4" className="py-24 text-center">
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="bg-slate-50 p-4 rounded-full mb-4">
+                            <Users2 className="text-slate-300" size={40} />
+                          </div>
+                          <h3 className="text-lg font-bold text-slate-800">
+                            No users found
+                          </h3>
+                          <p className="text-slate-400 text-sm max-w-xs mx-auto">
+                            We couldn't find anyone matching "{search}" or the
+                            selected filters.
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="xl:hidden">
+            {filteredUsers.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {currentItems.map((user) => (
+                  <div
+                    key={user.id}
+                    onClick={() => router.push(`/users/info/${user.id}`)}
+                    className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all active:scale-[0.98] cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-500">
+                          <UserCircle size={28} />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-slate-800">
+                            {user.name}
+                          </h3>
+                          <p className="text-xs text-slate-500 flex items-center gap-1">
+                            <Mail size={12} /> {user.email}
+                          </p>
+                        </div>
+                      </div>
+                      <span
+                        className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${
+                          user.status?.toLowerCase() === "active"
+                            ? "bg-green-50 text-green-600"
+                            : "bg-red-50 text-red-600"
+                        }`}
+                      >
+                        {user.status}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-4 border-t border-slate-50">
+                      <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                        {user.role}
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => handleEdit(e, user)}
+                          className="p-2 bg-slate-50 text-slate-600 rounded-xl hover:bg-blue-50"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={(e) => handleDelete(e, user.id)}
+                          className="p-2 bg-slate-50 text-red-600 rounded-xl hover:bg-red-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20 bg-slate-50/50 rounded-[40px] border-4 border-dashed border-slate-100">
+                <div className="bg-white w-16 h-16 rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-4">
+                  <Users2 className="text-slate-300" size={32} />
+                </div>
+                <h3 className="text-md font-bold text-slate-800">
+                  No matching users
+                </h3>
+                <p className="text-slate-500 text-xs mt-1 px-10">
+                  Try clearing filters to see more results.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {filteredUsers.length > itemsPerPage && (
+            <div className="pt-6">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            </div>
+          )}
+        </div>
+      </div>
 
       {isModalOpen && (
         <EditUserModal
