@@ -29,7 +29,7 @@ const handleGetOneItem = async (req, res) => {
 
 // Create item
 const handleCreateItem = async (req, res) => {
-  const { name, category, stock, price, description } = req.body;
+  const { name, category, stock, price, description, image } = req.body;
 
   try {
     await inventoryModel.createItem(
@@ -39,6 +39,7 @@ const handleCreateItem = async (req, res) => {
       price,
       description,
       req.user.id,
+      image
     );
     res.status(201).json({ message: "Item added!" });
   } catch (err) {
@@ -50,7 +51,7 @@ const handleCreateItem = async (req, res) => {
 // Update item
 const handleUpdateItem = async (req, res) => {
   const { id } = req.params;
-  const { name, category, stock, price, description } = req.body;
+  const { name, category, stock, price, description, image } = req.body;
 
   try {
     const result = await inventoryModel.updateItem(
@@ -61,6 +62,7 @@ const handleUpdateItem = async (req, res) => {
       price,
       description,
       req.user.id,
+      image
     );
     if (result.rowCount === 0) {
       return res

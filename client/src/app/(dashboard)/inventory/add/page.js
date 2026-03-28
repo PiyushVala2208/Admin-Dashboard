@@ -1,5 +1,5 @@
 "use client";
-import { PackagePlus, RotateCcw, CheckCircle2 } from "lucide-react";
+import { PackagePlus, RotateCcw, CheckCircle2, Image as ImageIcon, Link as LinkIcon } from "lucide-react";
 import { useState } from "react";
 import api from "@/app/utils/api";
 import { useRouter } from "next/navigation";
@@ -14,6 +14,7 @@ export default function AddItemPage() {
     price: "",
     description: "",
     status: "In Stock",
+    imageUrl: "", 
   };
 
   const [formData, setFormData] = useState(initialState);
@@ -36,6 +37,7 @@ export default function AddItemPage() {
         stock: parseInt(formData.stock),
         price: parseFloat(formData.price),
         description: formData.description,
+        image: formData.imageUrl, 
       });
 
       alert("Item Added Successfully!!");
@@ -56,21 +58,61 @@ export default function AddItemPage() {
           <PackagePlus size={28} className="text-blue-600" />
         </div>
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-            Add New Item
-          </h1>
-          <p className="text-sm text-slate-500">
-            Create a new entry in your inventory system
-          </p>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Add New Item</h1>
+          <p className="text-sm text-slate-500">Inventory entry with image URL preview</p>
         </div>
       </div>
 
       <div className="bg-white p-5 sm:p-8 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100">
         <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
+          
+          {/* IMAGE URL SECTION WITH PREVIEW */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            <div className="group">
+              <label className="text-sm font-semibold text-slate-700 mb-2 block group-focus-within:text-blue-600 transition-colors">
+                Product Image URL
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <LinkIcon size={16} className="text-slate-400" />
+                </div>
+                <input
+                  type="text"
+                  name="imageUrl"
+                  placeholder="https://example.com/photo.jpg"
+                  value={formData.imageUrl}
+                  onChange={handleChange}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
+                />
+              </div>
+              <p className="mt-2 text-[10px] text-slate-400">Paste a direct link to an image (Unsplash, Imgur, etc.)</p>
+            </div>
+
+            <div className="flex flex-col items-center">
+              <span className="text-sm font-semibold text-slate-700 mb-2 self-start">Preview</span>
+              <div className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
+                {formData.imageUrl ? (
+                  <img 
+                    src={formData.imageUrl} 
+                    alt="Preview" 
+                    className="w-full h-full object-contain"
+                    onError={(e) => { e.target.src = ""; alert("Invalid Image URL"); }}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center text-slate-400">
+                    <ImageIcon size={24} />
+                    <span className="text-[10px] mt-1">No Preview</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <hr className="border-slate-100" />
+
+          {/* BASIC INFO */}
           <div className="group">
-            <label className="text-sm font-semibold text-slate-700 mb-2 block group-focus-within:text-blue-600 transition-colors">
-              Item Name
-            </label>
+            <label className="text-sm font-semibold text-slate-700 mb-2 block group-focus-within:text-blue-600 transition-colors">Item Name</label>
             <input
               type="text"
               name="name"
@@ -83,9 +125,7 @@ export default function AddItemPage() {
           </div>
 
           <div className="group">
-            <label className="text-sm font-semibold text-slate-700 mb-2 block group-focus-within:text-blue-600 transition-colors">
-              Category
-            </label>
+            <label className="text-sm font-semibold text-slate-700 mb-2 block group-focus-within:text-blue-600 transition-colors">Category</label>
             <input
               type="text"
               name="category"
@@ -99,45 +139,23 @@ export default function AddItemPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="group">
-              <label className="text-sm font-semibold text-slate-700 mb-2 block group-focus-within:text-blue-600 transition-colors">
-                Initial Stock
-              </label>
-              <input
-                type="number"
-                name="stock"
-                required
-                value={formData.stock}
-                placeholder="0"
-                onChange={handleChange}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white transition-all"
-              />
+              <label className="text-sm font-semibold text-slate-700 mb-2 block group-focus-within:text-blue-600 transition-colors">Initial Stock</label>
+              <input type="number" name="stock" required value={formData.stock} placeholder="0" onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white transition-all" />
             </div>
             <div className="group">
-              <label className="text-sm font-semibold text-slate-700 mb-2 block group-focus-within:text-blue-600 transition-colors">
-                Price
-              </label>
-              <input
-                type="number"
-                name="price"
-                required
-                value={formData.price}
-                placeholder="0.00"
-                onChange={handleChange}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white transition-all"
-              />
+              <label className="text-sm font-semibold text-slate-700 mb-2 block group-focus-within:text-blue-600 transition-colors">Price</label>
+              <input type="number" name="price" required value={formData.price} placeholder="0.00" onChange={handleChange} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white transition-all" />
             </div>
           </div>
 
           <div className="group">
-            <label className="text-sm font-semibold text-slate-700 mb-2 block group-focus-within:text-blue-600 transition-colors">
-              Description
-            </label>
+            <label className="text-sm font-semibold text-slate-700 mb-2 block group-focus-within:text-blue-600 transition-colors">Description</label>
             <textarea
               name="description"
-              rows="4"
+              rows="3"
               required
               value={formData.description}
-              placeholder="Enter detailed description of the item..."
+              placeholder="Detailed description..."
               onChange={handleChange}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white transition-all resize-none"
             />
@@ -147,24 +165,16 @@ export default function AddItemPage() {
             <button
               type="button"
               onClick={() => setFormData(initialState)}
-              className="order-2 sm:order-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all font-medium text-sm active:scale-95"
+              className="order-2 sm:order-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all font-medium text-sm"
             >
-              <RotateCcw size={16} />
-              Reset Form
+              <RotateCcw size={16} /> Reset
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="order-1 sm:order-2 flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all font-semibold text-sm shadow-lg shadow-blue-200 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+              className="order-1 sm:order-2 flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all font-semibold text-sm shadow-lg shadow-blue-200 active:scale-95 disabled:opacity-70"
             >
-              {isSubmitting ? (
-                "Adding..."
-              ) : (
-                <>
-                  <CheckCircle2 size={18} />
-                  Add Item
-                </>
-              )}
+              {isSubmitting ? "Adding..." : <><CheckCircle2 size={18} /> Add Item</>}
             </button>
           </div>
         </form>
