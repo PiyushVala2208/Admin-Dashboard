@@ -174,7 +174,7 @@ export default function CartPage() {
                 </div>
 
                 <Link
-                  href="/checkout"
+                  href="/shop/checkout"
                   className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-purple-600 transition-all shadow-lg hover:shadow-purple-200 active:scale-[0.98] mb-6"
                 >
                   Proceed To Checkout <ArrowRight size={18} />
@@ -206,7 +206,7 @@ export default function CartPage() {
               change that!
             </p>
             <Link
-              href="/products"
+              href="/shop/products"
               className="inline-flex bg-purple-600 text-white px-10 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-purple-700 transition-all"
             >
               Go To Shop

@@ -94,7 +94,7 @@ export default function SignupPage() {
           <div className="flex items-center justify-center">
             <button
               type="submit"
-              className=" flex justify-center mt-5 w-[150px] py-3 px-5  border-none rounded-lg shadow-sm text-sm font-semibold focus:outline-none  
+              className=" flex justify-center mt-5 w-37.5 py-3 px-5  border-none rounded-lg shadow-sm text-sm font-semibold focus:outline-none  
                         bg-gradient-to-r from-slate-800 to-black text-white  bg-gradient-to-r from-slate-500 to-black text-white 
                         transition-all duration-1000 ease-out hover:from-black hover:to-slate-500  hover:scale-105 hover:shadow-lg"
             >
@@ -115,7 +115,7 @@ export default function SignupPage() {
             href="/login"
             className="font-medium text-blue-500 hover:text-blue-700"
           >
-            Register
+            Login
           </Link>
         </div>
       </div>

@@ -208,7 +208,7 @@ export default function ProductPage() {
                     (item) => item.id === product.id,
                   );
                   return (
-                    <Link href={`/products/${product.id}`} key={product.id}>
+                    <Link href={`/shop/products/${product.id}`} key={product.id}>
                       <article className="group cursor-pointer relative">
                         <div className="absolute top-4 right-4 z-20 md:top-6 md:right-6">
                           <button

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import api from "@/app/utils/api";
+import Cookies from "js-cookie";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -14,12 +15,24 @@ export default function LoginPage() {
     try {
       const res = await api.post("/auth/login", { email, password });
 
-      document.cookie = `token=${res.data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
-      localStorage.setItem("user", JSON.stringify(res.data.user));
+      const token = res.data.token;
+      const user = res.data.user;
 
-      alert("login Successful");
-      window.location.replace("/");
+      Cookies.set("token", token, { expires: 7, path: "/" });
+      Cookies.set("user", JSON.stringify(user), { expires: 7, path: "/" });
+
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(user));
+
+      const userRole = user.role.toLowerCase();
+
+      if (userRole === "admin") {
+        window.location.replace("/");
+      } else {
+        window.location.replace("/shop/home");
+      }
     } catch (error) {
+      console.error("Login Error:", error);
       alert(error.response?.data?.message || "Email or Password incorrect!");
     } finally {
       setLoading(false);
@@ -72,9 +85,8 @@ export default function LoginPage() {
           <div className="flex items-center justify-center">
             <button
               type="submit"
-              className=" flex justify-center mt-5 w-[150px] py-3 px-5  border-none rounded-lg shadow-sm text-sm font-semibold focus:outline-none  
-                        bg-gradient-to-r from-slate-800 to-black text-white  bg-gradient-to-r from-slate-500 to-black text-white 
-                        transition-all duration-1000 ease-out hover:from-black hover:to-slate-500  hover:scale-105 hover:shadow-lg"
+              disabled={loading}
+              className="flex justify-center mt-5 w-37.5 py-3 px-5 border-none rounded-lg shadow-sm text-sm font-semibold focus:outline-none bg-linear-to-r from-slate-800 to-black text-white transition-all duration-300 hover:scale-105 hover:shadow-lg disabled:opacity-50"
             >
               {loading ? (
                 <div className="flex items-center gap-2">

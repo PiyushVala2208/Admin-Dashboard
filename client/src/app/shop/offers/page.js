@@ -37,7 +37,7 @@ export default function OffersPage() {
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
           
           <Link
-            href="/products"
+            href="/shop/products"
             className="text-[10px] font-bold uppercase tracking-widest text-[#4C1D95]/40 hover:text-[#4C1D95] underline underline-offset-8 transition-colors"
           >
             Explore Collection

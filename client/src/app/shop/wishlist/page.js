@@ -61,7 +61,7 @@ export default function WishlistPage() {
             </p>
           </div>
           <Link
-            href="/products"
+            href="/shop/products"
             className="group flex items-center gap-2 bg-white px-6 py-3 rounded-2xl shadow-sm border border-slate-200 text-sm font-bold text-slate-700 hover:text-purple-600 transition-all hover:shadow-md"
           >
             <ArrowLeft
@@ -157,7 +157,7 @@ export default function WishlistPage() {
               when you're ready to make them yours.
             </p>
             <Link
-              href="/products"
+              href="/shop/products"
               className="inline-flex items-center gap-3 bg-purple-600 text-white px-12 py-5 rounded-4xl font-black text-xs uppercase tracking-[0.2em] hover:bg-purple-700 transition-all shadow-xl shadow-purple-100 active:scale-95"
             >
               <Sparkles size={18} /> Discover Now
