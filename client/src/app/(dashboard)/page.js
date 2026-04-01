@@ -44,7 +44,6 @@ export default function Home() {
           (user) => user.status === "Active" || user.isActive === true,
         ).length;
 
-        // Activity logic refined for "Premium" display
         const latestUser = userRes.data.map((u) => ({
           id: `user-${u.id}`,
           sortId: u.id,
@@ -84,6 +83,7 @@ export default function Home() {
         setLoading(false);
       }
     };
+
     fetchData();
   }, []);
 
@@ -92,7 +92,6 @@ export default function Home() {
       title: "Total Users",
       value: counts.users,
       icon: <Users size={22} />,
-      color: "from-blue-500 to-blue-600",
       light: "bg-blue-50 text-blue-600",
       trend: "+12% this month",
     },
@@ -100,7 +99,6 @@ export default function Home() {
       title: "Inventory",
       value: counts.items,
       icon: <Package2 size={22} />,
-      color: "from-emerald-500 to-emerald-600",
       light: "bg-emerald-50 text-emerald-600",
       trend: "Stable stock",
     },
@@ -108,7 +106,6 @@ export default function Home() {
       title: "Active Staff",
       value: counts.activeUsers,
       icon: <ShieldCheck size={22} />,
-      color: "from-purple-500 to-purple-600",
       light: "bg-purple-50 text-purple-600",
       trend: "85% uptime",
     },
@@ -116,7 +113,6 @@ export default function Home() {
       title: "Total Value",
       value: `${currencySymbol}${counts.revenue.toLocaleString()}`,
       icon: <Banknote size={22} />,
-      color: "from-amber-500 to-amber-600",
       light: "bg-amber-50 text-amber-600",
       trend: "+5.4% growth",
     },
@@ -160,7 +156,7 @@ export default function Home() {
         {stats.map((card, index) => (
           <div
             key={index}
-            className="group bg-white rounded-[2rem] p-6 border border-slate-100 shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:shadow-blue-200/30 transition-all duration-300 hover:-translate-y-1"
+            className="group bg-white rounded-4xl p-6 border border-slate-100 shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:shadow-blue-200/30 transition-all duration-300 hover:-translate-y-1"
           >
             <div className="flex justify-between items-start mb-4">
               <div
@@ -188,8 +184,8 @@ export default function Home() {
         ))}
       </div>
 
-      <div className=" gap-8 mt-10">
-        <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl shadow-slate-200/50 p-6 sm:p-8">
+      <div className="mt-10">
+        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl shadow-slate-200/50 p-6 sm:p-8">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-slate-900 rounded-xl">
@@ -199,12 +195,12 @@ export default function Home() {
                 Recent Activity
               </h2>
             </div>
-            <button className="px-4 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
-              VIEW ARCHIVE
+            <button className="px-4 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-xl transition-colors uppercase">
+              View Archive
             </button>
           </div>
 
-          <div className="space-y-6 relative before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-100">
+          <div className="space-y-6 relative before:absolute before:left-4.75 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
             {activities.map((activity) => (
               <div
                 key={activity.id}
@@ -217,7 +213,6 @@ export default function Home() {
                     {activity.icon}
                   </div>
                 </div>
-
                 <div className="flex-1 bg-slate-50/50 hover:bg-white p-4 rounded-2xl border border-transparent hover:border-slate-100 hover:shadow-lg hover:shadow-slate-100 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h4 className="text-sm font-black text-slate-800 leading-none">

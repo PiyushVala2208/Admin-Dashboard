@@ -17,6 +17,7 @@ export default function SettingPage() {
   const { updateSettings } = useSettings();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(true);
   const [settings, setSettings] = useState({
     companyName: "",
     companyEmail: "",
@@ -31,6 +32,15 @@ export default function SettingPage() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
+        const userRaw = localStorage.getItem("user");
+        if (userRaw) {
+          const user = JSON.parse(userRaw);
+          if (user.role?.toLowerCase() !== "admin") {
+            setIsAdmin(false);
+            setLoading(false);
+            return;
+          }
+        }
         const res = await api.get("/users/settings");
         if (res.data) {
           setSettings({
@@ -97,6 +107,17 @@ export default function SettingPage() {
         </p>
       </div>
     );
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+        <h2 className="text-xl font-bold text-slate-800">Access Denied</h2>
+        <p className="text-slate-500">
+          You don't have permission to view this page.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
