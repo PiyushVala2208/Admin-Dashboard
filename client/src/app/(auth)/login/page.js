@@ -3,11 +3,36 @@ import { useState } from "react";
 import Link from "next/link";
 import api from "@/app/utils/api";
 import Cookies from "js-cookie";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const router = useRouter(); 
+  const searchParams = useSearchParams();
+
+  const redirectTo = searchParams.get("redirect") || "/";
+
+  const syncGuestData = async (userToken) => {
+    try {
+      const guestCart = JSON.parse(localStorage.getItem("cart")) || [];
+      const guestWishlist = JSON.parse(localStorage.getItem("wishlist")) || [];
+
+      if (guestCart.length > 0 || guestWishlist.length > 0) {
+        await api.post(
+          "/auth/merge",
+          { cart: guestCart, wishlist: guestWishlist },
+          { headers: { Authorization: `Bearer ${userToken}` } },
+        );
+        console.log("Guest data synced successfully!");
+
+        localStorage.removeItem("cart");
+      }
+    } catch (err) {
+      console.error("Sync Error:", err);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,16 +45,17 @@ export default function LoginPage() {
 
       Cookies.set("token", token, { expires: 7, path: "/" });
       Cookies.set("user", JSON.stringify(user), { expires: 7, path: "/" });
-
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
+
+      await syncGuestData(token);
 
       const userRole = user.role.toLowerCase();
 
       if (userRole === "admin") {
-        window.location.replace("/");
+        router.replace("/");
       } else {
-        window.location.replace("/shop/home");
+        router.push(redirectTo); 
       }
     } catch (error) {
       console.error("Login Error:", error);
@@ -41,72 +67,68 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white px-5">
-      <div className="max-w-md w-full space-y-8 p-10 bg-slate-50 shadow-lg rounded-xl">
+      <div className="max-w-md w-full space-y-8 p-10 bg-slate-50 shadow-xl rounded-[2.5rem] border border-slate-200/50">
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-blue-600 tracking-tight italic py-2">
-            Welcome Back
-          </h1>
-          <p className="text-sm text-gray-500">
-            Sign in to your admin account.
+          <div className="inline-block p-4 bg-blue-50 rounded-2xl mb-4">
+            <h1 className="text-3xl font-black text-blue-600 tracking-tight italic">
+              D.SHOP
+            </h1>
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900">Welcome Back</h2>
+          <p className="text-sm text-slate-500 mt-2">
+            Sign in to continue your shopping journey.
           </p>
         </div>
 
         <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
-          <div className="space-y-5">
+          <div className="space-y-4">
             <div>
-              <label className="text-xs font-medium text-gray-500 uppercase tracking-widest">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">
                 Email Address
               </label>
               <input
                 type="email"
                 required
-                name="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="enter you email..."
-                className="mt-1 block w-full px-5 py-3 bg-slate-100 border border-slate-200 rounded-2xl focus:outline-none focus:border-blue-500 transition-all shadow-sm"
+                placeholder="enter your email..."
+                className="mt-1 block w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500 uppercase tracking-widest">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">
                 Password
               </label>
               <input
                 type="password"
                 required
-                name="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="enter yuor password..."
-                className="mt-1 block w-full px-5 py-3 bg-slate-100 border border-slate-200 rounded-2xl focus:outline-none focus:border-blue-500 transition-all shadow-sm"
+                placeholder="enter your password"
+                className="mt-1 block w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
               />
             </div>
           </div>
-          <div className="flex items-center justify-center">
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex justify-center mt-5 w-37.5 py-3 px-5 border-none rounded-lg shadow-sm text-sm font-semibold focus:outline-none bg-linear-to-r from-slate-800 to-black text-white transition-all duration-300 hover:scale-105 hover:shadow-lg disabled:opacity-50"
-            >
-              {loading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Wait...
-                </div>
-              ) : (
-                "Log In"
-              )}
-            </button>
-          </div>
-        </form>
-        <div className="text-center text-sm text-gray-500">
-          Don't have an account?{" "}
-          <Link
-            href="/register"
-            className="font-medium text-blue-500 hover:text-blue-700"
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-4 px-6 bg-slate-900 text-white rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-blue-600 transition-all duration-300 shadow-lg shadow-blue-200 active:scale-[0.98] disabled:opacity-50 mt-4"
           >
-            Create one
-          </Link>
+            {loading ? "Verifying..." : "Sign In"}
+          </button>
+        </form>
+
+        <div className="text-center pt-4">
+          <p className="text-sm text-slate-500 font-medium">
+            New here?
+            <Link
+              href="/register"
+              className="text-blue-600 font-bold hover:underline"
+            >
+              Create Account
+            </Link>
+          </p>
         </div>
       </div>
     </div>

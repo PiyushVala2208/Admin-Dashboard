@@ -1,5 +1,11 @@
 "use client";
-import { LogOut, Settings, UserCircle } from "lucide-react";
+import {
+  LogOut,
+  Settings,
+  UserCircle,
+  Package2,
+  ArrowUpRight,
+} from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
@@ -60,7 +66,19 @@ export default function Navbar() {
 
   return (
     <nav className="flex items-center justify-between top-0 z-40 h-16 md:h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 md:px-8 sticky">
-      <div className="flex-1"></div>
+      <div className="flex-1">
+        <button
+          onClick={() => (window.location.href = "/shop/home")}
+          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-bold rounded-2xl shadow-lg hover:scale-105 transition-all duration-300 group"
+        >
+          <Package2
+            size={20}
+            className="group-hover:rotate-12 transition-transform"
+          />
+          Visit My Shop
+          <ArrowUpRight size={18} />
+        </button>
+      </div>
 
       <div
         ref={dropdownRef}
@@ -114,7 +132,7 @@ export default function Navbar() {
               </Link>
 
               <Link
-                href="/setting"
+                href="/settings"
                 onClick={() => setIsOpen(false)}
                 className="flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-all rounded-xl group"
               >

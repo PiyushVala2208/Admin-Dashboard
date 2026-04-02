@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import api from "../utils/api";
+import api from "../../utils/api";
 import {
   Users,
   ShieldCheck,
@@ -35,16 +35,23 @@ export default function Home() {
           api.get("/inventory"),
         ]);
 
-        const totalValuation = inventoryRes.data.reduce(
-          (acc, item) => acc + (item.price || 0) * (item.stock || 0),
+        const userData = Array.isArray(userRes.data) ? userRes.data : [];
+        const inventoryData = Array.isArray(inventoryRes.data)
+          ? inventoryRes.data
+          : [];
+
+        const totalValuation = inventoryData.reduce(
+          (acc, item) =>
+            acc + (Number(item.price) || 0) * (Number(item.stock) || 0),
           0,
         );
 
-        const currentActiveUser = userRes.data.filter(
-          (user) => user.status === "Active" || user.isActive === true,
+        const currentActiveUser = userData.filter(
+          (user) =>
+            user && (user.status === "Active" || user.isActive === true),
         ).length;
 
-        const latestUser = userRes.data.map((u) => ({
+        const latestUser = userData.map((u) => ({
           id: `user-${u.id}`,
           sortId: u.id,
           user: u.name,
@@ -55,7 +62,7 @@ export default function Home() {
           color: "text-blue-600",
         }));
 
-        const inventoryActivities = inventoryRes.data.map((item) => ({
+        const inventoryActivities = inventoryData.map((item) => ({
           id: `inv-${item.id}`,
           sortId: item.id,
           user: "Inventory Admin",
@@ -67,13 +74,13 @@ export default function Home() {
         }));
 
         const combinedActivities = [...latestUser, ...inventoryActivities]
-          .sort((a, b) => b.sortId - a.sortId)
+          .sort((a, b) => (b.sortId || 0) - (a.sortId || 0))
           .slice(0, 5);
 
         setActivities(combinedActivities);
         setCounts({
-          users: userRes.data.length,
-          items: inventoryRes.data.length,
+          users: userData.length,
+          items: inventoryData.length,
           revenue: totalValuation,
           activeUsers: currentActiveUser,
         });
@@ -86,7 +93,6 @@ export default function Home() {
 
     fetchData();
   }, []);
-
   const stats = [
     {
       title: "Total Users",

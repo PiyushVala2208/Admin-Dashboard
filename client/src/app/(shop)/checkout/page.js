@@ -29,7 +29,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     const savedCart = JSON.parse(localStorage.getItem("cart")) || [];
     if (savedCart.length === 0) {
-      router.push("/shop/home"); // Khali cart ho toh wapas bhej do
+      router.push("/"); 
     }
     setCartItems(savedCart);
   }, [router]);
@@ -62,7 +62,7 @@ export default function CheckoutPage() {
 
     alert("Order Placed Successfully! (DEMO)");
 
-    router.push("/shop/home");
+    router.push("/");
   };
 
   return (
@@ -71,7 +71,7 @@ export default function CheckoutPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-6">
           <div>
             <Link
-              href="/shop/cart"
+              href="/cart"
               className="flex items-center gap-2 text-slate-400 hover:text-purple-600 transition-colors mb-4 group"
             >
               <ArrowLeft

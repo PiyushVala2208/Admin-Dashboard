@@ -37,7 +37,7 @@ export default function ShopHomePage() {
               key={index}
               className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentSlide ? "opacity-100 z-10" : "opacity-0 z-0"}`}
             >
-              <Link href="/shop/products">
+              <Link href="/products">
                 <img
                   src={slide.img}
                   alt={slide.subtitle}
@@ -57,7 +57,7 @@ export default function ShopHomePage() {
                   
                   <div className="pointer-events-auto">
                     <Link
-                      href="/shop/products"
+                      href="/products"
                       className="group inline-flex items-center gap-4 bg-[#7C3AED] text-white px-10 py-5 rounded-full font-bold uppercase text-[10px] tracking-widest hover:bg-[#5B21B6] transition-all shadow-xl active:scale-95"
                     >
                       Discover Now <ArrowRight size={16} className="group-hover:translate-x-2 transition-transform" />
@@ -86,7 +86,7 @@ export default function ShopHomePage() {
             The <span className="text-[#8B5CF6]">Signature</span> Edit
           </h2>
           <Link
-            href="/shop/products"
+            href="/products"
             className="text-[10px] font-black uppercase tracking-[0.2em] text-[#A78BFA] border-b border-[#A78BFA] pb-1 hover:text-[#7C3AED] hover:border-[#7C3AED] transition-all"
           >
             View All Collections
@@ -116,7 +116,7 @@ export default function ShopHomePage() {
               count: "40+ Items",
             },
           ].map((cat, i) => (
-            <Link key={i} href={"/shop/products"} className="group block">
+            <Link key={i} href={"/products"} className="group block">
               <div className="relative aspect-4/5 overflow-hidden rounded-[2.5rem] mb-6 bg-[#F5F3FF]">
                 <img
                   src={cat.img}

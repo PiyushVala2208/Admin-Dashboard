@@ -11,10 +11,13 @@ import {
   Loader2,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import Cookies from "js-cookie";
 
 export default function CartPage() {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     const savedCart = JSON.parse(localStorage.getItem("cart")) || [];
@@ -49,6 +52,17 @@ export default function CartPage() {
   const removeItem = (id) => {
     const updatedCart = cartItems.filter((item) => item.id !== id);
     saveCart(updatedCart);
+  };
+
+  const handleCheckout = (e) => {
+    e.preventDefault();
+    const token = Cookies.get("token");
+
+    if (!token) {
+      router.push("/login?redirect=/checkout");
+    } else {
+      router.push("/checkout");
+    }
   };
 
   const subtotal = cartItems.reduce(
@@ -173,12 +187,12 @@ export default function CartPage() {
                   </div>
                 </div>
 
-                <Link
-                  href="/shop/checkout"
+                <button
+                  onClick={handleCheckout}
                   className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-purple-600 transition-all shadow-lg hover:shadow-purple-200 active:scale-[0.98] mb-6"
                 >
                   Proceed To Checkout <ArrowRight size={18} />
-                </Link>
+                </button>
 
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
@@ -206,7 +220,7 @@ export default function CartPage() {
               change that!
             </p>
             <Link
-              href="/shop/products"
+              href="/products"
               className="inline-flex bg-purple-600 text-white px-10 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-purple-700 transition-all"
             >
               Go To Shop

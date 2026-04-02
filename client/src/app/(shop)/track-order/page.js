@@ -12,7 +12,6 @@ export default function TrackOrderPage() {
     if (!orderId) return;
     setLoading(true);
 
-    // Mock API Call
     setTimeout(() => {
       setTrackingData({
         id: orderId,

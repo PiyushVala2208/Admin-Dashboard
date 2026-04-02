@@ -20,13 +20,9 @@ export const SettingsProvider = ({ children }) => {
   });
   const [loading, setLoading] = useState(true);
 
-  const currencySymbols = {
-    INR: "₹",
-    USD: "$",
-    EUR: "€",
-    GBP: "£",
-  };
+  const currencySymbols = { INR: "₹", USD: "$", EUR: "€", GBP: "£" };
 
+  // SettingsContext.js mein fetchSettings wala part
   const fetchSettings = async () => {
     const token = getCookie("token");
     if (!token) {
@@ -40,11 +36,11 @@ export const SettingsProvider = ({ children }) => {
         setSettings({
           companyName: res.data.company_name || "",
           currency: res.data.currency || "INR",
-          darkmode: res.data.darkmode || false,
+          darkmode: !!res.data.darkmode,
         });
       }
     } catch (err) {
-      console.error("Context Fetch Error:", err);
+      console.warn("Settings fetch failed, keeping defaults.");
     } finally {
       setLoading(false);
     }
@@ -54,40 +50,26 @@ export const SettingsProvider = ({ children }) => {
     try {
       const res = await api.put("/users/settings", newSettings);
       if (res.status === 200) {
-        setSettings((prev) => ({
-          ...prev,
-          ...newSettings,
-        }));
+        setSettings((prev) => ({ ...prev, ...newSettings }));
         return { success: true };
       }
     } catch (err) {
-      console.error("Update Settings Error:", err);
       return { success: false, error: err };
     }
   };
 
   useEffect(() => {
-    const token = getCookie("token");
-
-    if (token) {
-      fetchSettings();
-    } else {
-      setLoading(false);
-      console.log("No token found, skipping settings fetch on this page.");
-    }
+    fetchSettings();
   }, []);
-
-  const currencySymbol = currencySymbols[settings.currency] || "₹";
 
   return (
     <SettingsContext.Provider
       value={{
         settings,
-        setSettings,
-        currencySymbol,
-        fetchSettings,
+        currencySymbol: currencySymbols[settings.currency] || "₹",
         loading,
         updateSettings,
+        fetchSettings,
       }}
     >
       {children}

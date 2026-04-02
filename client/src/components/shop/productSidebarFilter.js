@@ -93,7 +93,7 @@ export default function ProductSidebarFilter({
             <input
               type="range"
               min="0"
-              max="200000"
+              max="1000000"
               step="1000"
               value={priceRange}
               onChange={(e) => setPriceRange(e.target.value)}

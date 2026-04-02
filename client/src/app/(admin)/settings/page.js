@@ -32,16 +32,8 @@ export default function SettingPage() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const userRaw = localStorage.getItem("user");
-        if (userRaw) {
-          const user = JSON.parse(userRaw);
-          if (user.role?.toLowerCase() !== "admin") {
-            setIsAdmin(false);
-            setLoading(false);
-            return;
-          }
-        }
         const res = await api.get("/users/settings");
+
         if (res.data) {
           setSettings({
             companyName: res.data.company_name || "",
@@ -53,13 +45,17 @@ export default function SettingPage() {
             adminName: res.data.adminName || "",
             adminEmail: res.data.adminEmail || "",
           });
+
+          setIsAdmin(true);
         }
       } catch (err) {
         console.error("Error fetching settings:", err);
+        if (err.status === 403) setIsAdmin(false);
       } finally {
         setLoading(false);
       }
     };
+
     fetchSettings();
   }, []);
 

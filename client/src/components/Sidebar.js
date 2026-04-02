@@ -34,16 +34,27 @@ const menuItems = [
       { name: "Add Item", path: "/inventory/add" },
     ],
   },
-  { name: "Settings", icon: <Settings size={20} />, path: "/setting" },
+  { name: "Settings", icon: <Settings size={20} />, path: "/settings" },
 ];
 
 export default function Sidebar() {
   const [openMenus, setOpenMenus] = useState([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [userRole, setUserRole] = useState(null); // Role state added
 
   const sidebarRef = useRef(null);
   const pathname = usePathname();
+
+  // Role check logic added in useEffect
+  useEffect(() => {
+    const userRaw = localStorage.getItem("user");
+    if (userRaw) {
+      const user = JSON.parse(userRaw);
+      setUserRole(user.role?.toLowerCase() || "user");
+    }
+    setIsMobileOpen(false);
+  }, [pathname]);
 
   const handleLogout = async () => {
     if (!confirm("Are you sure you want to logout?")) return;
@@ -63,9 +74,10 @@ export default function Sidebar() {
     );
   };
 
-  useEffect(() => {
-    setIsMobileOpen(false);
-  }, [pathname]);
+  // If user is not admin, don't show the sidebar at all
+  if (userRole && userRole !== "admin") {
+    return null;
+  }
 
   return (
     <>

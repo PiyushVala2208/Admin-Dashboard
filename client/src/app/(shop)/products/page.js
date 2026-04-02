@@ -19,7 +19,7 @@ export default function ProductPage() {
 
   const [selectedCategory, setSelectedCategory] = useState([]);
   const [sortBy, setSortBy] = useState("newest");
-  const [priceRange, setPriceRange] = useState(200000);
+  const [priceRange, setPriceRange] = useState(1000000);
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
@@ -208,7 +208,7 @@ export default function ProductPage() {
                     (item) => item.id === product.id,
                   );
                   return (
-                    <Link href={`/shop/products/${product.id}`} key={product.id}>
+                    <Link href={`/products/${product.id}`} key={product.id}>
                       <article className="group cursor-pointer relative">
                         <div className="absolute top-4 right-4 z-20 md:top-6 md:right-6">
                           <button
@@ -278,7 +278,7 @@ export default function ProductPage() {
                     <button
                       onClick={() => {
                         setSelectedCategory([]);
-                        setPriceRange(200000);
+                        setPriceRange(1000000);
                       }}
                       className="text-[10px] font-bold uppercase tracking-widest text-[#4C1D95]/80 hover:text-[#7C3AED] underline underline-offset-4"
                     >
