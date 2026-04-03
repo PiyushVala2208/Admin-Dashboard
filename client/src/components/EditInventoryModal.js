@@ -1,7 +1,15 @@
 "use client";
 import { useState, useEffect } from "react";
 import api from "@/app/utils/api";
-import { Package, X, Tag, IndianRupee, Layers3, AlignLeft } from "lucide-react";
+import {
+  Package,
+  X,
+  Tag,
+  IndianRupee,
+  Layers3,
+  AlignLeft,
+  Image as ImageIcon,
+} from "lucide-react";
 
 export default function EditInventoryModal({
   isOpen,
@@ -16,6 +24,7 @@ export default function EditInventoryModal({
     price: 0,
     description: "",
     status: "In Stock",
+    image: "",
   });
 
   useEffect(() => {
@@ -27,6 +36,7 @@ export default function EditInventoryModal({
         price: item.price || 0,
         description: item.description || "",
         status: item.status || "In Stock",
+        image: item.image || item.image_url || "",
       });
     }
   }, [item]);
@@ -43,6 +53,7 @@ export default function EditInventoryModal({
         price: parseFloat(formData.price),
         description: formData.description,
         status: formData.status,
+        image: formData.image,
       };
 
       await api.put(`/inventory/${item.id}`, updatedData);
@@ -55,9 +66,8 @@ export default function EditInventoryModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4 ">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-9999 p-4 ">
       <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 flex flex-col max-h-[95vh] overflow-hidden animate-in fade-in zoom-in duration-200">
-        
         <div className="flex justify-between items-center p-6 border-b border-slate-100 shrink-0">
           <h2 className="text-xl sm:text-2xl font-bold text-slate-800">
             Edit Item Details
@@ -71,7 +81,11 @@ export default function EditInventoryModal({
         </div>
 
         <div className="overflow-y-auto p-6 no-scrollbar touch-pan-y">
-          <form id="edit-inventory-form" onSubmit={handleSubmit} className="space-y-5">
+          <form
+            id="edit-inventory-form"
+            onSubmit={handleSubmit}
+            className="space-y-5"
+          >
             <div>
               <label className="text-sm font-medium text-slate-600 mb-1.5 flex items-center gap-2">
                 <Package size={14} className="text-purple-600" /> Item Name
@@ -83,6 +97,20 @@ export default function EditInventoryModal({
                   setFormData({ ...formData, name: e.target.value })
                 }
                 required
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-slate-600 mb-1.5 flex items-center gap-2">
+                <ImageIcon size={14} className="text-purple-600" /> Image URL
+              </label>
+              <input
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition"
+                placeholder="https://example.com/image.jpg"
+                value={formData.image}
+                onChange={(e) =>
+                  setFormData({ ...formData, image: e.target.value })
+                }
               />
             </div>
 

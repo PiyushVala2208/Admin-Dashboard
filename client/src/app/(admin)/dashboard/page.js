@@ -15,6 +15,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useSettings } from "@/context/SettingsContext";
+import Link from "next/link";
 
 export default function Home() {
   const { currencySymbol } = useSettings();
@@ -146,6 +147,7 @@ export default function Home() {
             System status: <span className="text-slate-800">Operational</span>
           </p>
         </div>
+
         <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-2xl shadow-sm">
           <Clock size={16} className="text-slate-400" />
           <span className="text-sm font-bold text-slate-600">
