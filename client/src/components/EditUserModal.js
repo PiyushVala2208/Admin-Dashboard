@@ -32,7 +32,7 @@ export default function EditUserModal({ isOpen, onClose, user, onUpdate }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4 sm:p-6 md:p-8">
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4 sm:p-6 md:p-8">
       <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="flex justify-between items-center p-6 border-b border-slate-100 shrink-0">
           <h2 className="text-xl sm:text-2xl font-bold text-slate-800">

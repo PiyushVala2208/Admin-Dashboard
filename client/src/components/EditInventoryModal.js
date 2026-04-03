@@ -9,7 +9,10 @@ import {
   Layers3,
   AlignLeft,
   Image as ImageIcon,
+  ChevronDown,
 } from "lucide-react";
+
+const CATEGORIES = ["Electronics", "Accessories", "Furniture", "Clothing"];
 
 export default function EditInventoryModal({
   isOpen,
@@ -66,7 +69,7 @@ export default function EditInventoryModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-9999 p-4 ">
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-9999 p-4 ">
       <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 flex flex-col max-h-[95vh] overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="flex justify-between items-center p-6 border-b border-slate-100 shrink-0">
           <h2 className="text-xl sm:text-2xl font-bold text-slate-800">
@@ -119,14 +122,31 @@ export default function EditInventoryModal({
                 <label className="text-sm font-medium text-slate-600 mb-1.5 flex items-center gap-2">
                   <Tag size={14} className="text-purple-600" /> Category
                 </label>
-                <input
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition"
-                  value={formData.category}
-                  onChange={(e) =>
-                    setFormData({ ...formData, category: e.target.value })
-                  }
-                />
+                <div className="relative">
+                  <select
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition appearance-none cursor-pointer"
+                    value={formData.category}
+                    onChange={(e) =>
+                      setFormData({ ...formData, category: e.target.value })
+                    }
+                    required
+                  >
+                    <option value="" disabled>
+                      Select category
+                    </option>
+                    {CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={16}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                  />
+                </div>
               </div>
+
               <div>
                 <label className="text-sm font-medium text-slate-600 mb-1.5 flex items-center gap-2">
                   <IndianRupee size={14} className="text-purple-600" /> Price
@@ -204,7 +224,7 @@ export default function EditInventoryModal({
           <button
             form="edit-inventory-form"
             type="submit"
-            className="flex-1 order-1 sm:order-2 px-4 py-3 bg-slate-900 text-white hover:bg-black rounded-xl transition font-medium shadow-lg shadow-slate-200"
+            className="flex-1 order-1 sm:order-2 px-4 py-3 bg-slate-900 text-white hover:bg-black rounded-xl transition font-medium shadow-lg shadow-slate-200 active:scale-95 transition-all"
           >
             Save Changes
           </button>

@@ -9,6 +9,8 @@ import Pagination from "@/components/Pagination";
 import InventoryTable from "@/components/InventoryTable";
 import { useSettings } from "@/context/SettingsContext";
 
+const CATEGORIES = ["Electronics", "Accessories", "Furniture", "Clothing"];
+
 export default function AllItemsPage() {
   const router = useRouter();
   const [inventory, setInventory] = useState([]);
@@ -139,7 +141,7 @@ export default function AllItemsPage() {
         <div className="lg:w-72 shrink-0">
           <div className="sticky top-8">
             <SidebarFilter
-              categories={[...new Set(inventory.map((item) => item.category))]}
+              categories={CATEGORIES}
               activeFilters={activeFilters}
               setActiveFilters={setActiveFilters}
             />
