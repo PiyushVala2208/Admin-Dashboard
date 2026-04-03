@@ -4,28 +4,11 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'cdn.shopify.com', 
-        pathname: '/**',
+        hostname: '**', 
       },
       {
-        protocol: 'https',
-        hostname: 'pcchandraindia.com',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.gstatic.com',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'placehold.co',
-        pathname: '/**',
+        protocol: 'http',
+        hostname: '**', 
       },
     ],
   },
