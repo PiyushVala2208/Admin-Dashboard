@@ -49,7 +49,7 @@ export default function LocalStorageProfile() {
         <div className="max-w-5xl w-full flex items-center gap-6 md:gap-10 z-10">
           <div className="relative group shrink-0">
             <div className="w-24 h-24 md:w-36 md:h-36 rounded-full bg-white border-4 border-white/20 shadow-2xl flex items-center justify-center overflow-hidden transition-transform duration-500 group-hover:scale-105">
-              <User size={60} className="text-[#8B5CF6] w-12 h-12 md:w-[60px] md:h-[60px]" strokeWidth={1} />
+              <User size={60} className="text-[#8B5CF6] w-12 h-12 md:w-15 md:h-15" strokeWidth={1} />
             </div>
             <button className="absolute bottom-1 right-1 p-2 bg-white text-[#4C1D95] rounded-full shadow-lg border border-[#EEEBFF]">
               <Camera size={16} />
@@ -57,7 +57,7 @@ export default function LocalStorageProfile() {
           </div>
           
           <div className="text-white overflow-hidden">
-            <h1 className="text-2xl md:text-5xl font-serif italic tracking-tight truncate">{user.name}</h1>
+            <h1 className="text-2xl md:text-5xl font-serif italic tracking-tight truncate pb-2">{user.name}</h1>
             <div className="flex flex-wrap items-center gap-2 md:gap-3 mt-2">
               <span className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-[0.2em] border border-white/20 flex items-center gap-1.5">
                 <Shield size={12} /> {user.role}

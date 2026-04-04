@@ -14,16 +14,16 @@ const protect = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       const result = await getUserById(decoded.id);
-
-      const user = result?.rows ? result.rows[0] : result;
+      const user = result?.rows
+        ? result.rows[0]
+        : Array.isArray(result)
+          ? result[0]
+          : result;
 
       if (!user) {
-        console.error(
-          `[AUTH ERROR]: User with ID ${decoded.id} not found in DB.`,
-        );
-        return res.status(404).json({
+        return res.status(401).json({
           success: false,
-          message: "User not found in database. Please login again.",
+          message: "User not found. Please login again.",
         });
       }
 
@@ -54,9 +54,7 @@ const adminOnly = (req, res, next) => {
   if (req.user && userRole === "admin") {
     next();
   } else {
-    console.warn(
-      `[FORBIDDEN]: Unauthorized access attempt by role: ${req.user?.role}`,
-    );
+    console.warn(`[FORBIDDEN]: Access denied for role: ${req.user?.role}`);
     return res.status(403).json({
       success: false,
       message: "Access Denied: Admin privileges required!",

@@ -2,7 +2,6 @@ const {
   User,
   getAllUsers,
   getUserById,
-  createUser,
   deleteUser,
   updateUser,
   changePassword,
@@ -16,10 +15,10 @@ const bcrypt = require("bcryptjs");
 const handleGetUsers = async (req, res) => {
   try {
     const result = await getAllUsers(req.user.id);
-    res.json(result.rows);
+    res.json(result || []);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Server Error");
+    console.error("Fetch Users Error:", err.message);
+    res.status(500).json({ message: "Server Error" });
   }
 };
 
@@ -27,17 +26,17 @@ const handleGetUsers = async (req, res) => {
 const handleGetOneUser = async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await getUserById(id, req.user.id);
+    const user = await getUserById(id, req.user.id);
 
-    if (result.rows.length === 0) {
+    if (!user) {
       return res
         .status(404)
         .json({ message: "User not found or access denied" });
     }
 
-    res.json(result.rows[0]);
+    res.json(user);
   } catch (err) {
-    res.status(500).send("Server Error");
+    res.status(500).json({ message: "Server Error" });
   }
 };
 
@@ -45,15 +44,24 @@ const handleGetOneUser = async (req, res) => {
 const handleCreateUser = async (req, res) => {
   const { name, email, password, role } = req.body;
   try {
-    const result = await createUser(name, email, password, role, req.user.id);
-    res.json(result.rows[0]);
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const user = await User.save({
+      name,
+      email,
+      password: hashedPassword,
+      role,
+      adminId: req.user.id,
+    });
+    res.status(201).json(user);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Server Error: Email already exists or invalid data");
+    console.error("Create User Error:", err.message);
+    res.status(500).json({ message: "Email already exists or invalid data" });
   }
 };
 
-//Delete user
+// Delete user
 const handleDeleteUser = async (req, res) => {
   const { id } = req.params;
   try {
@@ -67,12 +75,12 @@ const handleDeleteUser = async (req, res) => {
 
     res.json({ message: "User deleted successfully!" });
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Error deleting user");
+    console.error("Delete Error:", err.message);
+    res.status(500).json({ message: "Error deleting user" });
   }
 };
 
-//Update user
+// Update user
 const handleUpdateUser = async (req, res) => {
   const { id } = req.params;
   const { name, email, role, status } = req.body;
@@ -88,23 +96,22 @@ const handleUpdateUser = async (req, res) => {
     res.json({ message: "User updated successfully!" });
   } catch (err) {
     console.error("Database Update Error:", err.message);
-    res.status(500).send("Server Error during update");
+    res.status(500).json({ message: "Server Error during update" });
   }
 };
 
-//Change Password
+// Change Password
 const handleChangePassword = async (req, res) => {
   const { currentPass, newPass } = req.body;
   const userId = req.user?.id;
 
   try {
-    const result = await getUserById(userId, userId);
-    const user = result.rows[0];
+    const user = await getUserById(userId, userId);
 
     if (!user) {
-      console.log("DEBUG: No user found in DB for ID:", userId);
       return res.status(404).json({ message: "User not found" });
     }
+
     const isMatch = await bcrypt.compare(currentPass, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: "Current password is incorrect" });
@@ -114,80 +121,75 @@ const handleChangePassword = async (req, res) => {
     const hashedPass = await bcrypt.hash(newPass, salt);
 
     await changePassword(userId, hashedPass);
-
     res.status(200).json({ message: "Password updated successfully!" });
   } catch (err) {
-    console.error("DETAILED ERROR:", err);
-    res.status(500).json({ message: "Server Error", error: err.message });
+    console.error("Password Change Error:", err.message);
+    res.status(500).json({ message: "Server Error" });
   }
 };
 
-//Fetch settings
+// Fetch Settings (Fix for Redirect Loop)
 const handleGetSettingsByUserId = async (req, res) => {
   try {
-    const userResult = await getUserById(req.user.id);
-    const user = userResult.rows[0];
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const user = await getUserById(userId);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res
+        .status(401)
+        .json({ message: "Session invalid: User removed from DB" });
     }
 
-    const result = await getSettingsByUserId(req.user.id);
+    const settings = await getSettingsByUserId(userId);
 
-    if (result.rows.length === 0) {
-      return res.json({
-        company_name: "",
-        company_email: "",
-        phone: "",
-        currency: "INR",
-        darkmode: false,
-        email_notification: true,
-        adminName: user.name,
-        adminEmail: user.email,
-      });
-    }
-
-    const settingsData = {
-      ...result.rows[0],
-      adminName: user.name,
-      adminEmail: user.email,
-    };
-
-    res.json(settingsData);
+    return res.status(200).json({
+      id: settings?.id || null,
+      company_name: settings?.company_name || "",
+      company_email: settings?.company_email || "",
+      phone: settings?.phone || "",
+      currency: settings?.currency || "INR",
+      darkmode: settings?.darkmode ?? false,
+      email_notification: settings?.email_notification ?? true,
+      adminName: user.name || "N/A",
+      adminEmail: user.email || "N/A",
+    });
   } catch (err) {
-    console.error("Fetch Settings Error:", err.message);
-    res.status(500).send("Server Error");
+    console.error("Settings Controller Error:", err.message);
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
-//Update settings
+// Update settings
 const handleUpdateUserSettings = async (req, res) => {
   try {
     const result = await updateUserSettings(req.user.id, req.body);
-    res.json({ message: "Settings Updated!", data: result.rows[0] });
+    res.json({ message: "Settings Updated!", data: result || {} });
   } catch (err) {
     console.error("Update Settings Error:", err.message);
-    res.status(500).send("Failed to update settings");
+    res.status(500).json({ message: "Failed to update settings" });
   }
 };
 
-//profile pic
+// Profile picture update
 const handleUpdateProfilePic = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: "Select file!!" });
     }
     const imageUrl = `/uploads/profiles/${req.file.filename}`;
-
     const result = await updateProfilePic(req.user.id, imageUrl);
 
     res.status(200).json({
       message: "Profile picture updated successfully!",
-      profile_pic: result.rows[0].profile_pic,
+      profile_pic: result.profile_pic,
     });
   } catch (err) {
-    console.error("Controller Error:", err.message);
-    res.status(500).json({ message: "Server error", error: err.message });
+    console.error("Profile Pic Error:", err.message);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
