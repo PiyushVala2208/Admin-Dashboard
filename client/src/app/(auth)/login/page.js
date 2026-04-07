@@ -9,7 +9,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter(); 
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const redirectTo = searchParams.get("redirect") || "/";
@@ -27,7 +27,7 @@ export default function LoginPage() {
         );
         console.log("Guest data synced successfully!");
 
-        localStorage.removeItem("cart");
+        // localStorage.removeItem("cart");
       }
     } catch (err) {
       console.error("Sync Error:", err);
@@ -40,23 +40,25 @@ export default function LoginPage() {
     try {
       const res = await api.post("/auth/login", { email, password });
 
-      const token = res.data.token;
-      const user = res.data.user;
+      const { token, user } = res.data;
 
       Cookies.set("token", token, { expires: 7, path: "/" });
       Cookies.set("user", JSON.stringify(user), { expires: 7, path: "/" });
+
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
 
       await syncGuestData(token);
 
-      const userRole = user.role.toLowerCase();
+      window.dispatchEvent(new Event("cartUpdate"));
 
+      const userRole = user.role.toLowerCase();
       if (userRole === "admin") {
-        router.replace("/");
+        router.replace("/dashboard");
       } else {
-        router.push(redirectTo); 
+        router.push(redirectTo || "/");
       }
+      
     } catch (error) {
       console.error("Login Error:", error);
       alert(error.response?.data?.message || "Email or Password incorrect!");

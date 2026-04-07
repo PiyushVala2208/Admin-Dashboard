@@ -5,13 +5,15 @@ export function middleware(request) {
   const userCookie = request.cookies.get("user")?.value;
   const { pathname } = request.nextUrl;
 
-  const isAdminPage = [
+  const protectedPaths = [
     "/dashboard",
     "/users",
     "/inventory",
     "/settings",
     "/profile",
-  ].some((path) => pathname.startsWith(path));
+    "/checkout",
+  ];
+  const isAdminPage = protectedPaths.some((path) => pathname.startsWith(path));
 
   const isAuthPage =
     pathname.startsWith("/login") || pathname.startsWith("/register");
@@ -21,12 +23,20 @@ export function middleware(request) {
   }
 
   if (isAdminPage && !token) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
-  if (isAdminPage && token) {
+  const onlyAdminPaths = ["/dashboard", "/users", "/inventory", "/settings"];
+  const isStrictAdminPath = onlyAdminPaths.some((path) =>
+    pathname.startsWith(path),
+  );
+
+  if (isStrictAdminPath && token) {
     try {
-      if (!userCookie) throw new Error("No User Info");
+      if (!userCookie)
+        return NextResponse.redirect(new URL("/login", request.url));
 
       const userData = JSON.parse(decodeURIComponent(userCookie));
 
@@ -34,7 +44,11 @@ export function middleware(request) {
         return NextResponse.redirect(new URL("/", request.url));
       }
     } catch (error) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      console.error("Middleware Cookie Parse Error:", error);
+      const response = NextResponse.redirect(new URL("/login", request.url));
+      response.cookies.delete("token");
+      response.cookies.delete("user");
+      return response;
     }
   }
 
