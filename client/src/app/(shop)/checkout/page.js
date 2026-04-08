@@ -1,20 +1,21 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowLeft,
   CreditCard,
   Truck,
-  MapPin,
   ShieldCheck,
-  CheckCircle2,
   ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import axios from "axios";
+import { toast } from "react-hot-toast";
 
 export default function CheckoutPage() {
   const router = useRouter();
   const [cartItems, setCartItems] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -29,7 +30,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     const savedCart = JSON.parse(localStorage.getItem("cart")) || [];
     if (savedCart.length === 0) {
-      router.push("/"); 
+      router.push("/");
     }
     setCartItems(savedCart);
   }, [router]);
@@ -38,6 +39,7 @@ export default function CheckoutPage() {
     (acc, item) => acc + item.price * item.quantity,
     0,
   );
+
   const shipping = subtotal > 1000 ? 0 : 99;
   const total = subtotal + shipping;
 
@@ -45,24 +47,73 @@ export default function CheckoutPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handlePlaceOrder = (e) => {
+  const handlePlaceOrder = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
-    console.log("Order Placed:", {
-      items: cartItems,
-      customer: formData,
-      total,
-    });
+    try {
+      const token = localStorage.getItem("token");
 
-    localStorage.removeItem("cart");
+      if (!token) {
+        toast.error("Please login to place an order");
+        router.push("/login");
+        return;
+      }
 
-    setCartItems([]);
+      const orderData = {
+        cartItems: cartItems.map((item) => ({
+          id: item.id,
+          name: item.name,
+          image: item.image || item.image_url,
+          price: item.price,
+          quantity: item.quantity,
+        })),
+        shippingAddress: {
+          fullName: `${formData.firstName} ${formData.lastName}`,
+          address: formData.address,
+          city: formData.city,
+          pincode: formData.zipCode,
+          phone: formData.phone,
+        },
+        totalAmount: total,
+        paymentMethod: formData.paymentMethod.toUpperCase(),
+      };
 
-    window.dispatchEvent(new Event("storage"));
+      const response = await axios.post(
+        "http://localhost:8000/api/orders/place",
+        orderData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          withCredentials: true,
+        },
+      );
 
-    alert("Order Placed Successfully! (DEMO)");
+      if (response.data.success) {
+        toast.success("Order placed successfully! 🎉");
 
-    router.push("/");
+        localStorage.removeItem("cart");
+        setCartItems([]);
+        window.dispatchEvent(new Event("storage"));
+
+        setTimeout(() => {
+          router.push("/my-orders");
+        }, 1500);
+      }
+    } catch (error) {
+      console.error("Order Error:", error);
+      if (error.response?.status === 401) {
+        toast.error("Session expired. Please login again.");
+        router.push("/login");
+      } else {
+        toast.error(
+          error.response?.data?.message || "Order failed! Please try again.",
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -143,6 +194,14 @@ export default function CheckoutPage() {
                 />
                 <input
                   type="text"
+                  name="phone"
+                  placeholder="Phone Number"
+                  required
+                  onChange={handleInputChange}
+                  className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-purple-400 outline-none transition-all md:col-span-2"
+                />
+                <input
+                  type="text"
                   name="address"
                   placeholder="Street Address"
                   required
@@ -173,6 +232,7 @@ export default function CheckoutPage() {
                 <div className="p-2.5 bg-green-50 rounded-xl text-green-600">
                   <CreditCard size={20} />
                 </div>
+
                 <h2 className="text-xl font-bold text-slate-900">
                   Payment Method
                 </h2>
@@ -191,10 +251,12 @@ export default function CheckoutPage() {
                       onChange={handleInputChange}
                       className="accent-purple-600 w-4 h-4"
                     />
+
                     <div>
                       <p className="font-bold text-slate-900">
                         Cash on Delivery
                       </p>
+
                       <p className="text-xs text-slate-500">
                         Pay when you receive the package
                       </p>
@@ -205,10 +267,12 @@ export default function CheckoutPage() {
                 <label className="flex items-center justify-between p-5 rounded-2xl border-2 border-slate-50 opacity-60 cursor-not-allowed">
                   <div className="flex items-center gap-4">
                     <input type="radio" disabled className="w-4 h-4" />
+
                     <div>
                       <p className="font-bold text-slate-900">
                         Online Payment (UPI / Cards)
                       </p>
+
                       <p className="text-xs text-red-400 uppercase font-bold tracking-tighter">
                         Coming Soon
                       </p>
@@ -220,9 +284,12 @@ export default function CheckoutPage() {
 
             <button
               type="submit"
-              className="w-full bg-slate-900 text-white py-6 rounded-3xl font-black text-sm uppercase tracking-[0.3em] hover:bg-purple-600 transition-all shadow-xl shadow-purple-200/20 active:scale-[0.98]"
+              disabled={loading}
+              className="w-full bg-slate-900 text-white py-6 rounded-3xl font-black text-sm uppercase tracking-[0.3em] hover:bg-purple-600 transition-all shadow-xl shadow-purple-200/20 active:scale-[0.98] disabled:bg-slate-400 disabled:cursor-not-allowed"
             >
-              Complete Order • ₹{total.toLocaleString()}
+              {loading
+                ? "Processing..."
+                : `Complete Order • ₹${total.toLocaleString()}`}
             </button>
           </form>
 

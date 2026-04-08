@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Filter, Loader2, Search, X, Heart } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import ProductSidebarFilter from "@/components/shop/productSidebarFilter";
@@ -8,6 +9,9 @@ import Link from "next/link";
 import Image from "next/image";
 
 export default function ProductPage() {
+  const searchParams = useSearchParams();
+  const categoryFilter = searchParams.get("category") || "";
+
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +26,26 @@ export default function ProductPage() {
   const [sortBy, setSortBy] = useState("newest");
   const [priceRange, setPriceRange] = useState(1000000);
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    if (categoryFilter && categories.length > 0) {
+      const rawCategory = decodeURIComponent(categoryFilter)
+        .trim()
+        .toLowerCase();
+
+      const exactMatch = categories.find(
+        (cat) => cat.toLowerCase() === rawCategory,
+      );
+
+      if (exactMatch) {
+        setSelectedCategory([exactMatch]);
+      } else {
+        setSelectedCategory([categoryFilter]);
+      }
+
+      setCurrentPage(1);
+    }
+  }, [categoryFilter, categories]);
 
   useEffect(() => {
     const savedWishlist = JSON.parse(localStorage.getItem("wishlist")) || [];
@@ -40,6 +64,8 @@ export default function ProductPage() {
 
     setWishlist(updatedWishlist);
     localStorage.setItem("wishlist", JSON.stringify(updatedWishlist));
+
+    window.dispatchEvent(new Event("cartUpdate"));
   };
 
   const fetchProducts = useCallback(async () => {
@@ -104,7 +130,19 @@ export default function ProductPage() {
         <div className="flex justify-between items-end min-h-12 gap-4">
           <div>
             <h1 className="text-3xl md:text-4xl font-serif italic text-[#4C1D95]">
-              The <span className="text-[#8B5CF6]">Full</span> Curation
+              {selectedCategory.length === 1 ? (
+                <>
+                  The
+                  <span className="text-[#8B5CF6] capitalize">
+                    {selectedCategory[0]}
+                  </span>
+                  Edit
+                </>
+              ) : (
+                <>
+                  The <span className="text-[#8B5CF6]">Full</span> Curation
+                </>
+              )}
             </h1>
           </div>
 
@@ -233,7 +271,7 @@ export default function ProductPage() {
                           </button>
                         </div>
 
-                        <div className="relative overflow-hidden rounded-2xl md:rounded-[2rem] bg-[#F5F3FF] transition-all duration-500 shadow-sm group-hover:shadow-lg aspect-[4/5]">
+                        <div className="relative overflow-hidden rounded-2xl md:rounded-4xl bg-[#F5F3FF] transition-all duration-500 shadow-sm group-hover:shadow-lg aspect-4/5">
                           <Image
                             src={
                               product.image ||

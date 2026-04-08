@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Cookies from "js-cookie";
@@ -12,45 +12,59 @@ import {
   ChevronRight,
   LogOut,
   LogIn,
+  Settings,
+  UserCircle,
+  LayoutDashboard,
 } from "lucide-react";
+import { useCart } from "@/context/CartContext";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const [cartCount, setCartCount] = useState(0);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const dropdownRef = useRef(null);
   const pathname = usePathname();
   const router = useRouter();
 
+  const { cartCount, wishlistCount, refreshData } = useCart();
+
   const checkAuth = () => {
     const token = Cookies.get("token");
-    setIsLoggedIn(!!token);
-  };
+    const userData = Cookies.get("user");
 
-  const updateCartCount = () => {
-    if (typeof window !== "undefined") {
-      const savedCart = JSON.parse(localStorage.getItem("cart")) || [];
-      const total = savedCart.reduce(
-        (acc, item) => acc + (item.quantity || 0),
-        0,
-      );
-      setCartCount(total);
+    setIsLoggedIn(!!token);
+
+    if (token && userData) {
+      try {
+        const user = JSON.parse(userData);
+        const role = user.role ? user.role.toLowerCase() : "";
+        setIsAdmin(role === "admin");
+      } catch (err) {
+        setIsAdmin(false);
+      }
+    } else {
+      setIsAdmin(false);
     }
   };
 
   useEffect(() => {
-    updateCartCount();
     checkAuth();
 
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsProfileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+
     window.addEventListener("storage", () => {
-      updateCartCount();
       checkAuth();
     });
 
-    window.addEventListener("cartUpdate", updateCartCount);
-
     return () => {
-      window.removeEventListener("storage", updateCartCount);
-      window.removeEventListener("cartUpdate", updateCartCount);
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("storage", () => checkAuth());
     };
   }, [pathname]);
 
@@ -59,15 +73,20 @@ export default function Navbar() {
     Cookies.remove("user");
     localStorage.removeItem("cart");
     setIsLoggedIn(false);
+    setIsAdmin(false);
+    setIsProfileOpen(false);
+
+    refreshData();
+
     window.dispatchEvent(new Event("storage"));
-    router.push("/login");
+    router.push("/");
   };
 
   const navLinks = [
     { name: "Home", href: "/" },
     { name: "All Collections", href: "/products" },
     { name: "Offers", href: "/offers" },
-    { name: "Track Order", href: "/track-order" },
+    { name: "My Orders", href: "/my-orders" },
   ];
 
   const isActive = (path) => pathname === path;
@@ -98,45 +117,126 @@ export default function Navbar() {
             ))}
           </div>
 
-          <div className="flex items-center gap-1 md:gap-6 relative z-110">
+          <div className="flex items-center gap-1 md:gap-4 relative">
+            {isAdmin && (
+              <Link
+                href="/dashboard"
+                className="hidden sm:flex items-center gap-2 px-4 py-2.5 bg-[#F5F3FF] text-[#4C1D95] rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-[#8B5CF6] hover:text-white transition-all border border-[#8B5CF6]/20 active:scale-95"
+              >
+                <LayoutDashboard size={16} strokeWidth={2} />
+                <span className="hidden lg:inline">Dashboard</span>
+              </Link>
+            )}
+
             <Link
               href="/wishlist"
-              className="p-2 text-[#4C1D95]/70 hover:text-[#A78BFA] transition-all active:scale-90"
+              className={`p-2.5 transition-all duration-300 rounded-full border relative group active:scale-90  ${
+                pathname === "/wishlist"
+                  ? "bg-[#8B5CF6] border-[#8B5CF6] text-white shadow-lg shadow-[#8B5CF6]/20"
+                  : "bg-white border-[#F5F3FF] text-[#4C1D95]/70 hover:bg-[#8B5CF6] hover:border-[#8B5CF6] hover:text-white hover:shadow-lg hover:shadow-[#8B5CF6]/20 hover:-translate-y-0.5"
+              }`}
             >
-              <Heart size={20} strokeWidth={1.5} />
+              <Heart
+                size={20}
+                strokeWidth={1.5}
+                className={`transition-transform duration-300 group-hover:scale-110 ${pathname === "/wishlist" ? "fill-white" : "group-hover:fill-white"}`}
+              />
+              {wishlistCount > 0 && (
+                <span
+                  className={`absolute top-1 right-1 text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center transition-all duration-300 ${pathname === "/wishlist" ? "bg-white text-[#8B5CF6]" : "bg-red-500 text-white"}`}
+                >
+                  {wishlistCount}
+                </span>
+              )}
             </Link>
 
             <Link
               href="/cart"
-              className="p-2 text-[#4C1D95] hover:text-[#7C3AED] transition-all relative active:scale-90"
+              className={`p-2.5 transition-all duration-300 rounded-full border relative group active:scale-90  ${
+                pathname === "/cart"
+                  ? "bg-[#8B5CF6] border-[#8B5CF6] text-white shadow-lg shadow-[#8B5CF6]/20"
+                  : "bg-white border-[#F5F3FF] text-[#4C1D95]/70 hover:bg-[#8B5CF6] hover:border-[#8B5CF6] hover:text-white hover:shadow-lg hover:shadow-[#8B5CF6]/20 hover:-translate-y-0.5"
+              }`}
             >
-              <ShoppingBag size={20} strokeWidth={1.5} />
+              <ShoppingBag
+                size={20}
+                strokeWidth={1.5}
+                className="transition-transform duration-300 group-hover:scale-110"
+              />
               {cartCount > 0 && (
-                <span className="absolute top-0 right-0 bg-[#7C3AED] text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-lg shadow-[#7C3AED]/20">
+                <span
+                  className={`absolute top-1 right-1 text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center transition-all duration-300 ${
+                    pathname === "/cart" || isProfileOpen
+                      ? "bg-white text-[#8B5CF6]"
+                      : "bg-[#7C3AED] text-white shadow-lg shadow-[#7C3AED]/20 group-hover:bg-white group-hover:text-[#8B5CF6]"
+                  }`}
+                >
                   {cartCount}
                 </span>
               )}
             </Link>
 
             {isLoggedIn ? (
-              <div className="flex items-center gap-4">
-                <Link
-                  href="/profile"
-                  className="p-2 text-[#4C1D95]/70 border border-[#F5F3FF] rounded-full bg-white shadow-sm hover:text-[#7C3AED]"
-                >
-                  <User size={18} strokeWidth={1.5} />
-                </Link>
+              <div className="relative" ref={dropdownRef}>
                 <button
-                  onClick={handleLogout}
-                  className="hidden md:flex p-2 text-red-500 hover:bg-red-50 rounded-full transition-all"
+                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  className={` p-2.5 transition-all duration-300 rounded-full border group ${
+                    isProfileOpen
+                      ? "bg-[#7C3AED] border-[#7C3AED] text-white shadow-lg shadow-[#7C3AED]/20 scale-105"
+                      : "bg-white border-[#F5F3FF] text-[#4C1D95]/70 hover:border-[#7C3AED]/30 hover:text-[#7C3AED] hover:bg-[#F5F3FF]/50 hover:-translate-y-0.5"
+                  }`}
                 >
-                  <LogOut size={18} />
+                  <User
+                    size={20}
+                    strokeWidth={1.5}
+                    className={`transition-transform duration-300 ${isProfileOpen ? "scale-110" : "group-hover:scale-110"}`}
+                  />
                 </button>
+
+                {isProfileOpen && (
+                  <div className="absolute right-0 mt-3 w-56 bg-white rounded-3xl shadow-2xl border border-[#F5F3FF] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="p-2">
+                      <Link
+                        href="/shopProfile"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 text-sm text-[#4C1D95] hover:bg-[#F5F3FF] rounded-2xl transition-all group"
+                      >
+                        <UserCircle
+                          size={18}
+                          className="text-[#A78BFA] group-hover:text-[#7C3AED]"
+                        />
+                        My Profile
+                      </Link>
+                      <Link
+                        href="/shopSettings"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 text-sm text-[#4C1D95] hover:bg-[#F5F3FF] rounded-2xl transition-all group"
+                      >
+                        <Settings
+                          size={18}
+                          className="text-[#A78BFA] group-hover:text-[#7C3AED]"
+                        />
+                        Settings
+                      </Link>
+                      <div className="h-px bg-[#F5F3FF] my-1 mx-2" />
+                      <button
+                        onClick={handleLogout}
+                        className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-500 hover:bg-red-50 rounded-2xl transition-all group"
+                      >
+                        <LogOut
+                          size={18}
+                          className="group-hover:-translate-x-1 transition-transform"
+                        />
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <Link
                 href="/login"
-                className="flex items-center gap-2 px-4 py-2 bg-[#F5F3FF] text-[#4C1D95] rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-[#7C3AED] hover:text-white transition-all"
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#4C1D95] text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-[#7C3AED] hover:scale-105 transition-all shadow-lg shadow-[#4C1D95]/20"
               >
                 <LogIn size={14} /> Login
               </Link>
@@ -153,7 +253,7 @@ export default function Navbar() {
       </nav>
 
       <div
-        className={`fixed inset-0 z-120 md:hidden transition-all duration-500 ${isOpen ? "visible" : "invisible"}`}
+        className={`fixed inset-0 z-[120] md:hidden transition-all duration-500 ${isOpen ? "visible" : "invisible"}`}
       >
         <div
           onClick={() => setIsOpen(false)}
@@ -172,10 +272,25 @@ export default function Navbar() {
           </div>
 
           <div className="flex-1 px-4 overflow-y-auto">
+            {isAdmin && (
+              <Link
+                href="/dashboard"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center justify-between p-4 rounded-2xl bg-purple-50 text-purple-700 mb-2 border border-purple-100"
+              >
+                <div className="flex items-center gap-3">
+                  <LayoutDashboard size={20} />
+                  <span className="text-lg font-bold italic">Dashboard</span>
+                </div>
+                <ChevronRight size={18} />
+              </Link>
+            )}
+
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
+                onClick={() => setIsOpen(false)}
                 className={`flex items-center justify-between p-4 rounded-2xl transition-all ${isActive(link.href) ? "bg-[#F5F3FF] text-[#7C3AED]" : "text-[#4C1D95]"}`}
               >
                 <span className="text-lg italic">{link.name}</span>
@@ -184,17 +299,27 @@ export default function Navbar() {
             ))}
           </div>
 
-          <div className="p-8">
+          <div className="p-8 border-t border-[#F5F3FF]">
             {isLoggedIn ? (
-              <button
-                onClick={handleLogout}
-                className="w-full bg-red-500 text-white py-4 rounded-2xl font-bold text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 shadow-lg"
-              >
-                <LogOut size={14} /> Sign Out
-              </button>
+              <div className="flex flex-col gap-3">
+                <Link
+                  href="/profile"
+                  onClick={() => setIsOpen(false)}
+                  className="w-full bg-[#F5F3FF] text-[#4C1D95] py-4 rounded-2xl font-bold text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2"
+                >
+                  <UserCircle size={14} /> My Profile
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="w-full bg-red-500 text-white py-4 rounded-2xl font-bold text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 shadow-lg"
+                >
+                  <LogOut size={14} /> Sign Out
+                </button>
+              </div>
             ) : (
               <Link
                 href="/login"
+                onClick={() => setIsOpen(false)}
                 className="w-full bg-[#4C1D95] text-white py-4 rounded-2xl font-bold text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 shadow-lg shadow-[#4C1D95]/20"
               >
                 <LogIn size={14} /> Sign In

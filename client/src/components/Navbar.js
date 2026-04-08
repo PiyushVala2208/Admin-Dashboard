@@ -40,7 +40,7 @@ export default function Navbar() {
       document.cookie =
         "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
       localStorage.clear();
-      window.location.replace("/login");
+      window.location.replace("/");
     } catch (error) {
       console.error("Logout error:", error);
     }
@@ -67,17 +67,7 @@ export default function Navbar() {
   return (
     <nav className="flex items-center justify-between top-0 z-40 h-16 md:h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 md:px-8 sticky">
       <div className="flex-1">
-        <button
-          onClick={() => (window.location.href = "/shop/home")}
-          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-bold rounded-2xl shadow-lg hover:scale-105 transition-all duration-300 group"
-        >
-          <Package2
-            size={20}
-            className="group-hover:rotate-12 transition-transform"
-          />
-          Visit My Shop
-          <ArrowUpRight size={18} />
-        </button>
+        
       </div>
 
       <div
@@ -108,6 +98,7 @@ export default function Navbar() {
               }}
             />
           </button>
+          
 
           {isOpen && (
             <div className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] border border-slate-200 p-2 animate-in fade-in zoom-in duration-200 z-50 origin-top-right">

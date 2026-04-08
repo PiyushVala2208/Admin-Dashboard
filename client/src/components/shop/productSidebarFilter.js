@@ -3,14 +3,13 @@ import { X } from "lucide-react";
 export default function ProductSidebarFilter({
   isFilterOpen,
   setIsFilterOpen,
-  selectedCategory, 
+  selectedCategory,
   setSelectedCategory,
   setCurrentPage,
   priceRange,
   setPriceRange,
-  categories, 
+  categories,
 }) {
-
   const handleCategoryChange = (cat) => {
     const isSelected = selectedCategory.includes(cat);
     let updatedCategories;
@@ -22,7 +21,7 @@ export default function ProductSidebarFilter({
     }
 
     setSelectedCategory(updatedCategories);
-    setCurrentPage(1); 
+    setCurrentPage(1);
   };
 
   return (
@@ -46,7 +45,7 @@ export default function ProductSidebarFilter({
         <div className="sticky top-32 space-y-10">
           <section>
             <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-[#4C1D95] mb-6 flex items-center justify-between">
-              Categories 
+              Categories
             </h3>
             <div className="space-y-3">
               {categories.length > 0 ? (
@@ -56,25 +55,33 @@ export default function ProductSidebarFilter({
                     className="flex items-center gap-3 cursor-pointer group"
                   >
                     <input
-                      type="checkbox" 
-                      checked={selectedCategory.includes(cat)}
+                      type="checkbox"
+                      checked={selectedCategory.some(
+                        (s) => s.toLowerCase() === cat.toLowerCase(),
+                      )}
                       onChange={() => handleCategoryChange(cat)}
                       className="w-4 h-4 accent-[#7C3AED] rounded border-gray-300 focus:ring-[#7C3AED]"
                     />
-                    <span className={`text-[11px] font-medium transition-colors uppercase tracking-wider ${
-                      selectedCategory.includes(cat) ? "text-[#7C3AED] font-bold" : "text-[#4C1D95]/70"
-                    } group-hover:text-[#7C3AED]`}>
+                    <span
+                      className={`text-[11px] font-medium transition-colors uppercase tracking-wider ${
+                        selectedCategory.includes(cat)
+                          ? "text-[#7C3AED] font-bold"
+                          : "text-[#4C1D95]/70"
+                      } group-hover:text-[#7C3AED]`}
+                    >
                       {cat}
                     </span>
                   </label>
                 ))
               ) : (
-                <p className="text-[10px] text-[#A78BFA] italic">Loading categories...</p>
+                <p className="text-[10px] text-[#A78BFA] italic">
+                  Loading categories...
+                </p>
               )}
 
               {selectedCategory.length > 0 && (
                 <button
-                  onClick={() => setSelectedCategory([])} 
+                  onClick={() => setSelectedCategory([])}
                   className="text-[9px] font-bold text-[#A78BFA] uppercase mt-2 hover:text-[#7C3AED] transition-colors underline underline-offset-4"
                 >
                   Clear All Filters ({selectedCategory.length})
@@ -86,9 +93,7 @@ export default function ProductSidebarFilter({
           <section>
             <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-[#4C1D95] mb-4">
               Max Price:
-              <span className="text-[#7C3AED] ml-1">
-                ₹{Number(priceRange)}
-              </span>
+              <span className="text-[#7C3AED] ml-1">₹{Number(priceRange)}</span>
             </h3>
             <input
               type="range"
