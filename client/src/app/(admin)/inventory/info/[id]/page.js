@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { notFound, useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import api from "@/app/utils/api";
 import {
   ArrowLeft,
@@ -11,6 +12,7 @@ import {
   Loader2,
   Calendar,
   Tag,
+  Package, 
 } from "lucide-react";
 import EditInventoryModal from "@/components/EditInventoryModal";
 
@@ -43,7 +45,7 @@ export default function ItemInfoPage() {
         await api.delete(`/inventory/${id}`);
         router.push("/inventory/all");
       } catch (err) {
-        alert("Failed to delete user.");
+        alert("Failed to delete record.");
       }
     }
   };
@@ -72,54 +74,73 @@ export default function ItemInfoPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-slate-50 p-6 sm:p-8 shadow-xl border border-slate-100 rounded-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 block sm:hidden">
-              <Tag size={40} className="text-slate-200 rotate-12" />
-            </div>
-
-            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
-              <div className="w-full sm:w-auto">
-                <span className="inline-block text-[10px] font-black uppercase tracking-[0.2em] text-slate-600 bg-slate-200 py-1.5 px-4 rounded-full mb-3">
-                  {item.category}
-                </span>
-                <h1 className="text-3xl sm:text-5xl font-bold text-blue-500 italic break-words">
-                  {item.name}
-                </h1>
-                <p className="text-slate-400 mt-3 text-[11px] tracking-widest font-mono">
-                  ID: #{item.id}
-                </p>
+          <div className="bg-white p-6 sm:p-8 shadow-xl border border-slate-100 rounded-[2.5rem] relative overflow-hidden">
+            <div className="flex flex-col md:flex-row gap-8 items-start">
+              <div className="w-full md:w-64 h-64 relative rounded-3xl overflow-hidden bg-slate-50 border border-slate-100 shrink-0 shadow-inner group">
+                {item.image ? (
+                  <Image
+                    src={item.image}
+                    alt={item.name}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-700"
+                    priority
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-300">
+                    <Package size={64} strokeWidth={1} />
+                    <span className="text-[10px] font-bold mt-2 uppercase tracking-widest">
+                      No Preview
+                    </span>
+                  </div>
+                )}
               </div>
-              <div
-                className={`px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-wider shadow-sm ${
-                  item.stock > 5
-                    ? "bg-green-100 text-green-700 border border-green-200"
-                    : "bg-red-100 text-red-700 border border-red-200"
-                }`}
-              >
-                {item.stock > 5 ? "● In Stock" : "● Low Stock"}
+
+              <div className="flex-1 w-full">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
+                  <div className="w-full sm:w-auto">
+                    <span className="inline-block text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 bg-blue-50 py-1.5 px-4 rounded-full mb-3">
+                      {item.category}
+                    </span>
+                    <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight break-words">
+                      {item.name}
+                    </h1>
+                    <p className="text-slate-400 mt-2 text-[11px] tracking-widest font-mono font-bold">
+                      REF: INV-{item.id?.toString().padStart(4, "0")}
+                    </p>
+                  </div>
+                  <div
+                    className={`px-4 py-2 rounded-xl font-bold text-[10px] uppercase tracking-wider shadow-sm border ${
+                      item.stock > 5
+                        ? "bg-green-50 text-green-700 border-green-100"
+                        : "bg-red-50 text-red-700 border-red-100"
+                    }`}
+                  >
+                    {item.stock > 5 ? "● In Stock" : "● Low Stock"}
+                  </div>
+                </div>
+
+                <hr className="my-5 border-slate-100" />
+
+                <div className="space-y-2">
+                  <h3 className="font-bold text-slate-400 text-[10px] uppercase tracking-widest">
+                    Product Description
+                  </h3>
+                  <p className="text-slate-600 text-sm sm:text-base leading-relaxed font-medium">
+                    {item.description ||
+                      "No detailed description available for this premium asset."}
+                  </p>
+                </div>
               </div>
             </div>
 
-            <hr className="my-6 border-slate-200" />
-
-            <div className="space-y-2">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                Description
-              </h3>
-              <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
-                {item.description ||
-                  "No description available for this product."}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
-              <div className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100 shadow-sm group hover:shadow-md transition-shadow">
-                <div className="p-3 bg-green-50 rounded-xl group-hover:scale-110 transition-transform">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-10">
+              <div className="flex items-center gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm group hover:bg-white hover:shadow-md transition-all">
+                <div className="p-3 bg-white rounded-xl group-hover:scale-110 transition-transform shadow-sm">
                   <IndianRupee size={24} className="text-green-600" />
                 </div>
                 <div>
                   <p className="text-[10px] text-slate-400 uppercase font-black tracking-tighter">
-                    Current Price
+                    Price Value
                   </p>
                   <p className="text-xl font-black text-slate-900">
                     ₹{item.price?.toLocaleString()}
@@ -127,17 +148,17 @@ export default function ItemInfoPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100 shadow-sm group hover:shadow-md transition-shadow">
-                <div className="p-3 bg-purple-50 rounded-xl group-hover:scale-110 transition-transform">
+              <div className="flex items-center gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm group hover:bg-white hover:shadow-md transition-all">
+                <div className="p-3 bg-white rounded-xl group-hover:scale-110 transition-transform shadow-sm">
                   <Layers size={24} className="text-purple-600" />
                 </div>
                 <div>
                   <p className="text-[10px] text-slate-400 uppercase font-black tracking-tighter">
-                    Available Stock
+                    Inventory Level
                   </p>
                   <p className="text-xl font-black text-slate-900">
                     {item.stock}{" "}
-                    <span className="text-sm font-normal text-slate-500">
+                    <span className="text-xs font-bold text-slate-400 uppercase ml-1">
                       Units
                     </span>
                   </p>
@@ -148,26 +169,41 @@ export default function ItemInfoPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-gradient-to-br from-slate-800 to-black text-white p-6 sm:p-8 rounded-[2rem] shadow-2xl relative overflow-hidden group">
-            <h3 className="flex text-lg font-bold mb-6 items-center gap-2 relative z-10">
-              <History size={20} className="text-blue-400" /> Activity Log
+          <div className="bg-gradient-to-r from-slate-800 to-black text-white p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden border border-white/5">
+            <div className="absolute top-[-10%] right-[-10%] w-32 h-32 bg-blue-500/10 rounded-full blur-3xl"></div>
+
+            <h3 className="flex text-sm font-black mb-8 items-center gap-2 relative z-10 uppercase tracking-[0.2em] text-slate-400">
+              <History size={16} className="text-blue-400" /> Activity Log
             </h3>
 
-            <div className="space-y-5 text-sm relative z-10">
-              <div className="flex justify-between items-center border-b border-white/10 pb-3">
-                <span className="text-slate-400">Category</span>
-                <span className="font-semibold">{item.category}</span>
+            <div className="space-y-6 text-sm relative z-10">
+              <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                <span className="text-slate-500 font-bold uppercase text-[10px]">
+                  Registry
+                </span>
+                <span className="font-semibold text-slate-200">
+                  {item.category}
+                </span>
               </div>
-              <div className="flex justify-between items-center border-b border-white/10 pb-3">
-                <span className="text-slate-400">Last Checked</span>
-                <span className="font-semibold flex items-center gap-1">
-                  <Calendar size={14} /> Today
+              <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                <span className="text-slate-500 font-bold uppercase text-[10px]">
+                  Verification
+                </span>
+                <span className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
+                  <Calendar size={14} className="text-blue-500" />{" "}
+                  {new Date().toLocaleDateString()}
                 </span>
               </div>
               <div className="flex justify-between items-center pt-2">
-                <span className="text-slate-400">Supply Status</span>
+                <span className="text-slate-500 font-bold uppercase text-[10px]">
+                  Supply Score
+                </span>
                 <span
-                  className={`font-black ${item.stock > 5 ? "text-green-400" : "text-red-400"}`}
+                  className={`font-black text-[11px] px-2 py-1 rounded-md ${
+                    item.stock > 5
+                      ? "bg-green-500/10 text-green-400"
+                      : "bg-red-500/10 text-red-400"
+                  }`}
                 >
                   {item.stock > 5 ? "OPTIMAL" : "CRITICAL"}
                 </span>
@@ -175,18 +211,18 @@ export default function ItemInfoPage() {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl space-y-4">
+          <div className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4">
             <button
               onClick={() => setIsEditModalOpen(true)}
-              className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-blue-700 active:scale-95 transition-all shadow-lg shadow-blue-100"
+              className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-blue-600 active:scale-95 transition-all shadow-xl shadow-slate-200 hover:shadow-blue-100"
             >
-              Edit Item Details
+              Update Details
             </button>
             <button
               onClick={handleDelete}
-              className="w-full border-2 border-red-50 text-red-500 py-4 rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-red-50 active:scale-95 transition-all"
+              className="w-full bg-white border border-red-100 text-red-500 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-red-50 active:scale-95 transition-all"
             >
-              Remove Record
+              Purge Record
             </button>
           </div>
         </div>

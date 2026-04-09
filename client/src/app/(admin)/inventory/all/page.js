@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Package, Search, Pencil, Trash2, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import api from "@/app/utils/api";
 import EditInventoryModal from "@/components/EditInventoryModal";
 import SidebarFilter from "@/components/InvantorySidebarFilter";
@@ -207,9 +208,6 @@ export default function AllItemsPage() {
                           <h3 className="text-lg font-bold text-slate-800">
                             No items found
                           </h3>
-                          <p className="text-slate-400 text-sm max-w-xs mx-auto">
-                            We couldn't find any inventory matching "{search}".
-                          </p>
                         </div>
                       </td>
                     </tr>
@@ -231,13 +229,30 @@ export default function AllItemsPage() {
                       className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all active:scale-[0.98] cursor-pointer"
                     >
                       <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h3 className="font-bold text-slate-800 text-lg leading-tight">
-                            {item.name}
-                          </h3>
-                          <p className="text-slate-500 text-xs mt-1 font-medium">
-                            {item.category}
-                          </p>
+                        <div className="flex items-center gap-4">
+                          <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-50 border border-slate-100 shrink-0">
+                            {item.image ? (
+                              <Image
+                                src={item.image}
+                                alt={item.name}
+                                fill
+                                className="object-cover"
+                              />
+                            ) : (
+                              <Package
+                                className="absolute inset-0 m-auto text-slate-300"
+                                size={20}
+                              />
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-slate-800 text-lg leading-tight">
+                              {item.name}
+                            </h3>
+                            <p className="text-slate-500 text-xs mt-1 font-medium">
+                              {item.category}
+                            </p>
+                          </div>
                         </div>
                         <span
                           className={`px-2 py-1 text-[10px] font-black rounded-md border ${status.color}`}
@@ -283,9 +298,6 @@ export default function AllItemsPage() {
                 <h3 className="text-md font-bold text-slate-800">
                   No stock found
                 </h3>
-                <p className="text-slate-500 text-xs mt-1 px-10">
-                  Try searching for something else or check your filters.
-                </p>
               </div>
             )}
           </div>
