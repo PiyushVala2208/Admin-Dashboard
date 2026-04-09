@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { toast } from "react-hot-toast";
+import Cookies from "js-cookie";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -30,7 +31,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     const savedCart = JSON.parse(localStorage.getItem("cart")) || [];
     if (savedCart.length === 0) {
-      router.push("/");
+      router.push("/cart");
     }
     setCartItems(savedCart);
   }, [router]);
@@ -39,7 +40,6 @@ export default function CheckoutPage() {
     (acc, item) => acc + item.price * item.quantity,
     0,
   );
-
   const shipping = subtotal > 1000 ? 0 : 99;
   const total = subtotal + shipping;
 
@@ -49,11 +49,18 @@ export default function CheckoutPage() {
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
+
+    if (!formData.address || !formData.city || !formData.zipCode) {
+      return toast.error("Please fill all shipping details");
+    }
+    if (!formData.phone || formData.phone.length < 10) {
+      return toast.error("Valid phone number is required");
+    }
+
     setLoading(true);
 
     try {
-      const token = localStorage.getItem("token");
-
+      const token = Cookies.get("token");
       if (!token) {
         toast.error("Please login to place an order");
         router.push("/login");
@@ -61,22 +68,27 @@ export default function CheckoutPage() {
       }
 
       const orderData = {
-        cartItems: cartItems.map((item) => ({
-          id: item.id,
+        orderItems: cartItems.map((item) => ({
+          product: item.id || item._id, 
           name: item.name,
-          image: item.image || item.image_url,
           price: item.price,
           quantity: item.quantity,
+          image: item.image || item.image_url,
         })),
-        shippingAddress: {
-          fullName: `${formData.firstName} ${formData.lastName}`,
+        shippingInfo: {
           address: formData.address,
           city: formData.city,
           pincode: formData.zipCode,
-          phone: formData.phone,
+          phoneNo: formData.phone,
         },
-        totalAmount: total,
-        paymentMethod: formData.paymentMethod.toUpperCase(),
+        paymentInfo: {
+          id: "COD_" + Date.now(), 
+          status: "Succeeded",
+        },
+        itemsPrice: subtotal,
+        shippingPrice: shipping,
+        total_amount: total,
+        payment_method: formData.paymentMethod.toUpperCase(),
       };
 
       const response = await axios.post(
@@ -91,31 +103,23 @@ export default function CheckoutPage() {
       );
 
       if (response.data.success) {
-        toast.success("Order placed successfully! 🎉");
-
+        toast.success("Order Placed! 🥂");
         localStorage.removeItem("cart");
-        setCartItems([]);
         window.dispatchEvent(new Event("storage"));
-
-        setTimeout(() => {
-          router.push("/my-orders");
-        }, 1500);
+        router.replace("/my-orders");
       }
     } catch (error) {
-      console.error("Order Error:", error);
-      if (error.response?.status === 401) {
-        toast.error("Session expired. Please login again.");
-        router.push("/login");
-      } else {
-        toast.error(
-          error.response?.data?.message || "Order failed! Please try again.",
-        );
-      }
+      console.error("Order Error Trace:", error.response?.data);
+
+      const errorMsg =
+        error.response?.data?.message || "Server Error: Check Backend Logs";
+      toast.error(errorMsg);
+
+      if (error.response?.status === 401) router.push("/login");
     } finally {
       setLoading(false);
     }
   };
-
   return (
     <div className="min-h-screen bg-[#FDFCFE] py-12 px-4 md:px-10">
       <div className="max-w-6xl mx-auto">
