@@ -2,135 +2,123 @@ const OrderModel = require("../models/orderModel");
 
 const createOrder = async (req, res) => {
   try {
-    if (!req.body.items || req.body.items.length === 0) {
+    const { cartItems, shippingAddress, totalAmount, paymentMethod } = req.body;
+
+    if (!cartItems || cartItems.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Your cart is empty. Cannot place an order.",
+        message: "Your cart is empty.",
       });
     }
 
     const orderData = {
       userId: req.user.id,
-      ...req.body,
+      totalAmount: totalAmount,
+      paymentMethod: paymentMethod || "COD",
+      cartItems: cartItems,
+      shippingAddress: {
+        fullName: shippingAddress?.fullName || "",
+        address: shippingAddress?.address,
+        city: shippingAddress?.city,
+        pincode: shippingAddress?.pincode,
+        phone: shippingAddress?.phone,
+      },
     };
 
     const orderId = await OrderModel.placeOrder(orderData);
 
     res.status(201).json({
       success: true,
-      message: "Order placed successfully",
+      message: "Order placed successfully! 🥂",
       orderId,
     });
   } catch (error) {
-    console.error("Order Controller Error:", error);
+    console.error("Order Controller Error:", error.message);
+
+    if (
+      error.message.includes("Insufficient stock") ||
+      error.message.includes("not found")
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
     res.status(500).json({
       success: false,
-      message: "Server error while placing order",
+      message: "An unexpected error occurred while placing your order",
+      error: error.message,
     });
   }
 };
 
 const fetchUserOrders = async (req, res) => {
   try {
-    const userId = req.user.id;
-
-    const orders = await OrderModel.getUserOrders(userId);
-
-    res.status(200).json({
-      success: true,
-      count: orders.length,
-      orders,
-    });
+    const orders = await OrderModel.getUserOrders(req.user.id);
+    res.status(200).json({ success: true, count: orders.length, orders });
   } catch (error) {
-    console.error("Fetch order Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to retrieve your order history",
-    });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to retrieve orders" });
   }
 };
 
 const fetchOrderDetails = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
-    const userRole = req.user.role;
-
-    let order;
-    if (req.originalUrl.includes("/admin/")) {
-      order = await OrderModel.getOrderById(id);
-    } else {
-      order = await OrderModel.getOrderById(id, userId);
-    }
+    const isAdminPath = req.originalUrl.includes("/admin/");
+    const order = await OrderModel.getOrderById(
+      id,
+      isAdminPath ? null : req.user.id,
+    );
 
     if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: "Order not found or unauthorized access",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
     }
-
-    res.status(200).json({
-      success: true,
-      order,
-    });
+    res.status(200).json({ success: true, order });
   } catch (error) {
-    console.error("Fetch Single Order Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while fetching order details",
-    });
+    res
+      .status(500)
+      .json({ success: false, message: "Error fetching order details" });
   }
 };
 
-//Admin Controllers
+// Admin: Get all orders
 const getAllOrdersAdmin = async (req, res) => {
   try {
     const orders = await OrderModel.getAllOrdersAdmin();
-    res.status(200).json({
-      success: true,
-      orders,
-    });
+    res.status(200).json({ success: true, orders });
   } catch (error) {
-    console.error("Admin Fetch Orders Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch all orders",
-    });
+    res.status(500).json({ success: false, message: "Admin fetch failed" });
   }
 };
 
+// Admin: Update Status
 const updateOrderStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-
-    if (!status) {
+    if (!status)
       return res
         .status(400)
-        .json({ success: false, message: "Status is required" });
-    }
+        .json({ success: false, message: "Status required" });
 
-    const updateOrder = await OrderModel.updateOrderStatus(id, status);
+    const updatedOrder = await OrderModel.updateOrderStatus(
+      id,
+      status.toUpperCase(),
+    );
+    if (!updatedOrder)
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
 
-    if (!updateOrder) {
-      return res.status(404).json({
-        success: false,
-        message: "Order not found",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Order status updated successfully",
-      order: updateOrder,
-    });
+    res
+      .status(200)
+      .json({ success: true, message: "Status updated", order: updatedOrder });
   } catch (error) {
-    console.error("Update Status Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update order status",
-    });
+    res.status(500).json({ success: false, message: "Update failed" });
   }
 };
 

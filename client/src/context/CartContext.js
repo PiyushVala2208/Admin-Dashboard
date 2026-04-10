@@ -6,8 +6,6 @@ import {
   useEffect,
   useCallback,
 } from "react";
-import Cookies from "js-cookie";
-import api from "@/app/utils/api";
 
 const CartContext = createContext();
 
@@ -26,9 +24,9 @@ export const CartProvider = ({ children }) => {
 
     setCartItems(localCart);
     setWishlistItems(localWish);
-    setCartCount(
-      localCart.reduce((acc, item) => acc + (Number(item.quantity) || 0), 0),
-    );
+
+    setCartCount(localCart.length);
+
     setWishlistCount(localWish.length);
 
     setLoading(false);

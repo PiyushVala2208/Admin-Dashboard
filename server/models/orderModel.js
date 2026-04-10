@@ -12,15 +12,43 @@ const OrderModel = {
     try {
       await client.query("BEGIN");
 
+      for (const item of cartItems) {
+        const productId = item.product || item.id;
+
+        const stockCheck = await client.query(
+          "SELECT stock, name FROM inventory WHERE id = $1 FOR UPDATE",
+          [productId],
+        );
+
+        if (stockCheck.rows.length === 0) {
+          throw new Error(`Product not found: ${item.name}`);
+        }
+
+        const currentStock = stockCheck.rows[0].stock;
+
+        if (currentStock < item.quantity) {
+          throw new Error(
+            `Insufficient stock for ${item.name}. Available: ${currentStock}, Requested: ${item.quantity}`,
+          );
+        }
+
+        await client.query(
+          "UPDATE inventory SET stock = stock - $1 WHERE id = $2",
+          [item.quantity, productId],
+        );
+      }
+
       const orderQuery = `
         INSERT INTO orders (user_id, total_amount, payment_method)
         VALUES ($1, $2, $3) RETURNING id
       `;
+
       const orderRes = await client.query(orderQuery, [
         userId,
-        totalAmount,
+        parseFloat(totalAmount),
         paymentMethod,
       ]);
+
       const orderId = orderRes.rows[0].id;
 
       const itemsQuery = `
@@ -31,7 +59,7 @@ const OrderModel = {
       for (const item of cartItems) {
         await client.query(itemsQuery, [
           orderId,
-          item.id,
+          item.product || item.id,
           item.name,
           item.image,
           item.price,
@@ -43,6 +71,7 @@ const OrderModel = {
         INSERT INTO shipping_details (order_id, full_name, address, city, pincode, phone)
         VALUES ($1, $2, $3, $4, $5, $6)
       `;
+
       await client.query(shippingQuery, [
         orderId,
         shippingAddress.fullName,
@@ -89,7 +118,7 @@ const OrderModel = {
     }
   },
 
-async getOrderById(orderId, userId) {
+  async getOrderById(orderId, userId) {
     try {
       const query = `
         SELECT 

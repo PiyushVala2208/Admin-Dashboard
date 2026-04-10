@@ -68,27 +68,24 @@ export default function CheckoutPage() {
       }
 
       const orderData = {
-        orderItems: cartItems.map((item) => ({
-          product: item.id || item._id, 
+        cartItems: cartItems.map((item) => ({
+          id: item.id || item._id,
           name: item.name,
           price: item.price,
           quantity: item.quantity,
           image: item.image || item.image_url,
         })),
-        shippingInfo: {
+        shippingAddress: {
+          fullName: `${formData.firstName} ${formData.lastName}`.trim(),
           address: formData.address,
           city: formData.city,
           pincode: formData.zipCode,
-          phoneNo: formData.phone,
+          phone: formData.phone,
         },
-        paymentInfo: {
-          id: "COD_" + Date.now(), 
-          status: "Succeeded",
-        },
+        totalAmount: total,
+        paymentMethod: formData.paymentMethod.toUpperCase(),
         itemsPrice: subtotal,
         shippingPrice: shipping,
-        total_amount: total,
-        payment_method: formData.paymentMethod.toUpperCase(),
       };
 
       const response = await axios.post(

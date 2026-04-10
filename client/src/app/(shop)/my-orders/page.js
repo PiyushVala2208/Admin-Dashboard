@@ -19,7 +19,6 @@ export default function MyOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // --- PREMIUM STATUS CONFIG ---
   const getStatusStyles = (status) => {
     const s = status?.toLowerCase();
     switch (s) {
@@ -56,13 +55,12 @@ export default function MyOrdersPage() {
         );
 
         if (res.data.success) {
-          // --- SMART SORTING (Active > Delivered > Cancelled) ---
           const sortedOrders = res.data.orders.sort((a, b) => {
             const getPriority = (status) => {
               const s = status?.toLowerCase();
               if (s === "cancelled") return 3;
               if (s === "delivered") return 2;
-              return 1; // Processing, Shipped, etc.
+              return 1; 
             };
 
             const priorityA = getPriority(a.status);
@@ -70,7 +68,6 @@ export default function MyOrdersPage() {
 
             if (priorityA !== priorityB) return priorityA - priorityB;
 
-            // Same priority? Newest first
             return (
               new Date(b.created_at || b.createdAt) -
               new Date(a.created_at || a.createdAt)

@@ -14,6 +14,7 @@ import {
   X,
   ShoppingCart,
   ArrowUpRight,
+  ShoppingBag,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 
@@ -39,6 +40,11 @@ const menuItems = [
       { name: "All Items", path: "/inventory/all" },
       { name: "Add Item", path: "/inventory/add" },
     ],
+  },
+  {
+    name: "Orders",
+    icon: <ShoppingBag size={20} />,
+    path: "/orders",
   },
   {
     name: "Settings",
