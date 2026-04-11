@@ -75,10 +75,10 @@ export default function Navbar() {
         className="relative flex items-center gap-3 md:gap-5"
       >
         <div className="hidden sm:flex flex-col items-right text-right border-l border-slate-200 pl-4 md:pl-6">
-          <p className="text-sm font-bold text-slate-800 truncate max-w-[150px]">
+          <p className="text-sm font-bold text-slate-800 truncate max-w-37.5">
             {userData.name}
           </p>
-          <p className="text-[10px] text-slate-500 font-medium truncate max-w-[150px]">
+          <p className="text-[10px] text-slate-500 font-medium truncate max-w-37.5">
             {userData.email}
           </p>
         </div>

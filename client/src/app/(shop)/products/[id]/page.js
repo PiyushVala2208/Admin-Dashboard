@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation"; 
 import {
   Heart,
   ShoppingCart,
@@ -10,17 +10,23 @@ import {
   Star,
   Loader2,
   CheckCircle2,
-  Ban, 
+  Ban,
+  ArrowLeft, 
+  Minus,
+  Plus,
 } from "lucide-react";
 import axios from "axios";
 import Image from "next/image";
 
 export default function ProductDetails() {
   const { id } = useParams();
+  const router = useRouter(); 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [isAddedToCart, setIsAddedToCart] = useState(false);
+
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -51,7 +57,6 @@ export default function ProductDetails() {
   }, [id]);
 
   const addToCart = () => {
-    // Prevent adding to cart if out of stock
     if (!product || product.stock === 0) return;
 
     const savedCart = JSON.parse(localStorage.getItem("cart")) || [];
@@ -60,27 +65,23 @@ export default function ProductDetails() {
     );
 
     if (existingItemIndex > -1) {
-      savedCart[existingItemIndex].quantity += 1;
+      const newQty = savedCart[existingItemIndex].quantity + selectedQuantity;
+      savedCart[existingItemIndex].quantity = Math.min(newQty, product.stock);
     } else {
-      savedCart.push({ ...product, quantity: 1 });
+      savedCart.push({ ...product, quantity: selectedQuantity });
     }
 
     localStorage.setItem("cart", JSON.stringify(savedCart));
     setIsAddedToCart(true);
-
     window.dispatchEvent(new Event("storage"));
-
     setTimeout(() => setIsAddedToCart(false), 2000);
   };
 
   const toggleWishlist = () => {
     const saved = JSON.parse(localStorage.getItem("wishlist")) || [];
-    let updated;
-    if (isWishlisted) {
-      updated = saved.filter((item) => item.id !== product.id);
-    } else {
-      updated = [...saved, product];
-    }
+    let updated = isWishlisted
+      ? saved.filter((item) => item.id !== product.id)
+      : [...saved, product];
     localStorage.setItem("wishlist", JSON.stringify(updated));
     setIsWishlisted(!isWishlisted);
     window.dispatchEvent(new Event("storage"));
@@ -100,10 +101,18 @@ export default function ProductDetails() {
       </div>
     );
 
-  const isOutOfStock = product.stock === 0;
+  const isOutOfStock = product.stock <= 0;
+  const isLowStock = product.stock > 0 && product.stock <= 5;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 md:px-8 py-8 md:py-16 bg-white">
+    <div className="max-w-6xl mx-auto px-4 md:px-8 py-8 md:py-12 bg-white">
+      <button
+        onClick={() => router.back()}
+        className="flex items-center gap-2 text-slate-400 hover:text-purple-600 transition-colors mb-6 text-[10px] font-bold uppercase tracking-widest"
+      >
+        <ArrowLeft size={14} /> Back to Collection
+      </button>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-start">
         <div className="relative w-full max-w-md mx-auto lg:max-w-none">
           <div className="aspect-4/5 relative rounded-4xl overflow-hidden bg-[#F5F3FF] shadow-sm">
@@ -117,12 +126,11 @@ export default function ProductDetails() {
               fill
               priority
               className={`object-cover transition-transform duration-700 ${isOutOfStock ? "grayscale opacity-70" : "hover:scale-105"}`}
-              sizes="(max-width: 768px) 100vw, 50vw"
             />
             {isOutOfStock && (
               <div className="absolute inset-0 bg-black/5 backdrop-blur-[2px] flex items-center justify-center">
                 <span className="bg-white/90 px-6 py-2 rounded-full text-red-600 font-black uppercase tracking-[0.3em] text-xs shadow-xl border border-red-100">
-                  Out of Stock
+                  Sold Out
                 </span>
               </div>
             )}
@@ -138,11 +146,6 @@ export default function ProductDetails() {
               {product.name}
             </h1>
 
-            <p className="text-slate-600 text-sm md:text-base leading-relaxed mb-5">
-              {product.description ||
-                "Indulge in premium quality and timeless design. This curated piece brings together modern aesthetics with exceptional craftsmanship for your daily lifestyle."}
-            </p>
-
             <div className="flex items-center gap-3 mb-5">
               <div className="flex items-center bg-green-50 px-2.5 py-0.5 rounded-full text-green-700 text-[10px] font-bold border border-green-100">
                 4.5 <Star size={10} className="fill-green-700 ml-1" />
@@ -150,30 +153,58 @@ export default function ProductDetails() {
               <span className="text-slate-400 text-[10px] font-medium uppercase tracking-widest border-l border-slate-200 pl-3">
                 1.2k Ratings
               </span>
-              {isOutOfStock && (
-                <span className="ml-auto text-red-500 font-bold text-[9px] uppercase tracking-widest animate-pulse">
-                  Currently Unavailable
+
+              {isLowStock && (
+                <span className="ml-auto text-orange-600 font-bold text-[9px] uppercase tracking-widest animate-pulse bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
+                  Only {product.stock} left in stock
                 </span>
               )}
             </div>
 
-            <div className="flex items-baseline gap-3">
+            <div className="flex items-baseline gap-3 mb-6">
               <span
                 className={`text-2xl font-black tracking-tight ${isOutOfStock ? "text-slate-400" : "text-slate-900"}`}
               >
                 ₹{Number(product.price).toLocaleString()}
               </span>
               {!isOutOfStock && (
-                <>
-                  <span className="text-slate-400 line-through text-base">
-                    ₹{Number(product.price + 500).toLocaleString()}
-                  </span>
-                  <span className="text-orange-500 font-bold text-[11px] uppercase tracking-wider">
-                    Special Offer
-                  </span>
-                </>
+                <span className="text-slate-400 line-through text-base">
+                  ₹{Number(product.price + 500).toLocaleString()}
+                </span>
               )}
             </div>
+
+            {!isOutOfStock && (
+              <div className="flex items-center gap-4 mb-6">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                  Select Quantity
+                </span>
+                <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden">
+                  <button
+                    onClick={() =>
+                      setSelectedQuantity((prev) => Math.max(1, prev - 1))
+                    }
+                    className="p-3 hover:bg-slate-50 text-slate-600 transition-colors"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <span className="w-10 text-center text-sm font-bold text-slate-900">
+                    {selectedQuantity}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setSelectedQuantity((prev) =>
+                        Math.min(product.stock, prev + 1),
+                      )
+                    }
+                    className="p-3 hover:bg-slate-50 text-slate-600 transition-colors"
+                    disabled={selectedQuantity >= product.stock}
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 mb-8">
@@ -182,19 +213,19 @@ export default function ProductDetails() {
               disabled={isOutOfStock}
               className={`flex-[2] py-4 rounded-xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2.5 transition-all shadow-lg ${
                 isOutOfStock
-                  ? "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none border border-slate-200"
+                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
                   : isAddedToCart
-                    ? "bg-green-600 text-white shadow-green-100 active:scale-95"
-                    : "bg-slate-900 text-white hover:bg-purple-600 shadow-slate-200 active:scale-95"
+                    ? "bg-green-600 text-white"
+                    : "bg-slate-900 text-white hover:bg-purple-600 active:scale-95"
               }`}
             >
               {isOutOfStock ? (
                 <>
-                  <Ban size={16} /> Out of Stock
+                  <Ban size={16} /> Sold Out
                 </>
               ) : isAddedToCart ? (
                 <>
-                  <CheckCircle2 size={16} /> Added to Bag
+                  <CheckCircle2 size={16} /> Added ({selectedQuantity})
                 </>
               ) : (
                 <>
@@ -204,16 +235,9 @@ export default function ProductDetails() {
             </button>
             <button
               onClick={toggleWishlist}
-              className={`flex-1 border border-slate-200 py-4 rounded-xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2.5 transition-all active:scale-95 ${
-                isWishlisted
-                  ? "bg-red-50 border-red-100 text-red-500"
-                  : "bg-white text-slate-700 hover:border-purple-200 hover:text-purple-600"
-              }`}
+              className={`flex-1 border border-slate-200 py-4 rounded-xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2.5 transition-all active:scale-95 ${isWishlisted ? "bg-red-50 text-red-500" : "bg-white text-slate-700"}`}
             >
-              <Heart
-                size={16}
-                className={isWishlisted ? "fill-red-500 text-red-500" : ""}
-              />
+              <Heart size={16} className={isWishlisted ? "fill-red-500" : ""} />{" "}
               Wishlist
             </button>
           </div>

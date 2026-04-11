@@ -247,6 +247,8 @@ export default function ProductPage() {
                     (item) => item.id === product.id,
                   );
                   const isOutOfStock = product.stock === 0;
+                  const isLowStock = product.stock > 0 && product.stock <= 5;
+                  const isFewLeft = product.stock > 5 && product.stock <= 10;
 
                   return (
                     <Link href={`/products/${product.id}`} key={product.id}>
@@ -287,14 +289,30 @@ export default function ProductPage() {
                           <div className="absolute inset-0 bg-[#4C1D95]/0 group-hover:bg-[#4C1D95]/5 transition-colors duration-500" />
 
                           <span
-                            className={`absolute top-3 left-3 bg-white/95 backdrop-blur-md px-2.5 py-1 text-[7px] font-black uppercase tracking-widest rounded-full shadow-sm z-10 ${isOutOfStock ? "text-red-500" : "text-[#7C3AED]"}`}
+                            className={`absolute top-3 left-3 px-2.5 py-1 text-[7px] font-black uppercase tracking-widest rounded-full shadow-sm z-10 backdrop-blur-md 
+                                 ${
+                                   isOutOfStock
+                                     ? "bg-red-500 text-white"
+                                     : isLowStock
+                                       ? "bg-orange-100 text-orange-600 border border-orange-200 animate-pulse"
+                                       : "bg-white/95 text-[#7C3AED]"
+                                 }`}
                           >
                             {isOutOfStock
-                              ? "Out of Stock"
-                              : product.stock <= 5
-                                ? "Low Stock"
-                                : "Exclusive"}
+                              ? "Sold Out"
+                              : isLowStock
+                                ? `Only ${product.stock} Left`
+                                : isFewLeft
+                                  ? "Limited Edition"
+                                  : "Exclusive"}
                           </span>
+                          {isOutOfStock && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[2px]">
+                              <span className="bg-black/60 text-white px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border border-white/20">
+                                Check Back Later
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         <div className="mt-4">
@@ -310,9 +328,9 @@ export default function ProductPage() {
                             >
                               ₹{Number(product.price).toLocaleString()}
                             </span>
-                            {isOutOfStock && (
-                              <span className="text-red-500 text-[10px] font-bold uppercase tracking-tighter italic">
-                                Sold Out
+                            {isLowStock && (
+                              <span className="text-orange-500 text-[9px] font-bold italic animate-bounce">
+                                Selling Fast!
                               </span>
                             )}
                           </div>

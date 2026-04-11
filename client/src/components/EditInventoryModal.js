@@ -52,16 +52,20 @@ export default function EditInventoryModal({
       const updatedData = {
         name: formData.name,
         category: formData.category,
-        stock: parseInt(formData.stock),
-        price: parseFloat(formData.price),
+        stock: parseInt(formData.stock) || 0,
+        price: parseFloat(formData.price) || 0,
         description: formData.description,
         status: formData.status,
         image: formData.image,
       };
 
-      await api.put(`/inventory/${item.id}`, updatedData);
-      onUpdate();
+      const res = await api.put(`/inventory/${item.id}`, updatedData);
+
       onClose();
+
+      if (onUpdate) {
+        onUpdate({ ...updatedData, id: item.id });
+      }
     } catch (err) {
       console.error("Update failed:", err);
       alert("Edit failed!!");
@@ -224,7 +228,7 @@ export default function EditInventoryModal({
           <button
             form="edit-inventory-form"
             type="submit"
-            className="flex-1 order-1 sm:order-2 px-4 py-3 bg-slate-900 text-white hover:bg-black rounded-xl transition font-medium shadow-lg shadow-slate-200 active:scale-95 transition-all"
+            className="flex-1 order-1 sm:order-2 px-4 py-3 bg-slate-900 text-white hover:bg-black rounded-xl font-medium shadow-lg shadow-slate-200 active:scale-95 transition-all"
           >
             Save Changes
           </button>

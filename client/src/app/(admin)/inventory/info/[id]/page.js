@@ -40,7 +40,7 @@ export default function ItemInfoPage() {
   }, [id]);
 
   const handleDelete = async () => {
-    if (confirm("Sach mein delete karna hai?")) {
+    if (confirm("are you sure?")) {
       try {
         await api.delete(`/inventory/${id}`);
         router.push("/inventory/all");
@@ -222,7 +222,7 @@ export default function ItemInfoPage() {
               onClick={handleDelete}
               className="w-full bg-white border border-red-100 text-red-500 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-red-50 active:scale-95 transition-all"
             >
-              Purge Record
+              Delete Product
             </button>
           </div>
         </div>

@@ -27,7 +27,7 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const { cartCount, wishlistCount, refreshData } = useCart();
+  const { cartCount, wishlistCount, refreshData, cartItems } = useCart();
 
   const checkAuth = () => {
     const token = Cookies.get("token");
@@ -163,7 +163,7 @@ export default function Navbar() {
                 strokeWidth={1.5}
                 className="transition-transform duration-300 group-hover:scale-110"
               />
-              {cartCount > 0 && (
+              {cartItems?.length > 0 && (
                 <span
                   className={`absolute top-1 right-1 text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center transition-all duration-300 ${
                     pathname === "/cart" || isProfileOpen
@@ -171,7 +171,7 @@ export default function Navbar() {
                       : "bg-[#7C3AED] text-white shadow-lg shadow-[#7C3AED]/20 group-hover:bg-white group-hover:text-[#8B5CF6]"
                   }`}
                 >
-                  {cartCount}
+                  {cartItems.length}
                 </span>
               )}
             </Link>
@@ -303,7 +303,7 @@ export default function Navbar() {
             {isLoggedIn ? (
               <div className="flex flex-col gap-3">
                 <Link
-                  href="/profile"
+                  href="/shopProfile"
                   onClick={() => setIsOpen(false)}
                   className="w-full bg-[#F5F3FF] text-[#4C1D95] py-4 rounded-2xl font-bold text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2"
                 >
