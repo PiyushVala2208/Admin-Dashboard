@@ -33,7 +33,7 @@ export default function UserInfopage() {
         setUser(res.data);
         setLoading(false);
       } catch (err) {
-        console.error("User nahi mila:", err);
+        console.error("User not found:", err);
         setLoading(false);
       }
     };

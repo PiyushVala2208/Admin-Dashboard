@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Truck,
   Loader2,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -37,9 +38,12 @@ export default function CartPage() {
         if (item.id === id) {
           const newQty = item.quantity + delta;
 
-          if (newQty < 1) {
-            return null;
+          if (newQty < 1) return null;
+
+          if (newQty > item.stock) {
+            return item;
           }
+
           return { ...item, quantity: newQty };
         }
         return item;
@@ -57,7 +61,6 @@ export default function CartPage() {
   const handleCheckout = (e) => {
     e.preventDefault();
     const token = Cookies.get("token");
-
     if (!token) {
       router.push("/login?redirect=/checkout");
     } else {
@@ -117,21 +120,33 @@ export default function CartPage() {
                     <p className="text-slate-400 text-sm font-medium italic">
                       ₹{Number(item.price).toLocaleString()} each
                     </p>
+
+                    {item.quantity >= item.stock && (
+                      <p className="text-[9px] text-orange-500 font-bold uppercase mt-2 flex items-center justify-center sm:justify-start gap-1">
+                        <AlertCircle size={10} /> Maximum stock reached
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex items-center bg-slate-50 rounded-xl p-1 border border-slate-100">
                     <button
                       onClick={() => updateQuantity(item.id, -1)}
-                      className="p-2 hover:bg-white rounded-lg transition-colors text-slate-600"
+                      disabled={item.quantity <= 1}
+                      className="p-2 hover:bg-white rounded-lg transition-colors text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <Minus size={16} />
                     </button>
-                    <span className="w-10 text-center font-bold text-slate-900">
+                    <span className="w-10 text-center font-bold text-slate-900 text-sm">
                       {item.quantity}
                     </span>
                     <button
                       onClick={() => updateQuantity(item.id, 1)}
-                      className="p-2 hover:bg-white rounded-lg transition-colors text-slate-600"
+                      disabled={item.quantity >= item.stock}
+                      className={`p-2 rounded-lg transition-colors ${
+                        item.quantity >= item.stock
+                          ? "text-slate-300 cursor-not-allowed"
+                          : "hover:bg-white text-slate-600"
+                      }`}
                     >
                       <Plus size={16} />
                     </button>
@@ -157,7 +172,6 @@ export default function CartPage() {
                 <h2 className="text-xl font-black text-slate-900 mb-8 border-b pb-4">
                   Order Summary
                 </h2>
-
                 <div className="space-y-4 mb-8">
                   <div className="flex justify-between text-slate-500 font-medium">
                     <span>Subtotal</span>
@@ -215,13 +229,9 @@ export default function CartPage() {
             <h2 className="text-2xl font-black text-slate-900 mb-2">
               Your cart feels lonely
             </h2>
-            <p className="text-slate-500 text-sm mb-10 max-w-xs mx-auto">
-              Looks like you haven't added anything to your cart yet. Let's
-              change that!
-            </p>
             <Link
               href="/products"
-              className="inline-flex bg-purple-600 text-white px-10 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-purple-700 transition-all"
+              className="inline-flex bg-purple-600 text-white px-10 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-purple-700 transition-all mt-8"
             >
               Go To Shop
             </Link>

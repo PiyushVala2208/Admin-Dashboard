@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image"; 
 import { ArrowRight } from "lucide-react";
 
 export default function ShopHomePage() {
@@ -10,22 +11,22 @@ export default function ShopHomePage() {
     {
       title: "FUTURE <br /> INTERFACES",
       subtitle: "Electronics Showcase",
-      img: "https://images.unsplash.com/photo-1483058712412-4245e9b90334?q=80&w=2000&auto=format&fit=crop",
+      img: "https://images.unsplash.com/photo-1483058712412-4245e9b90334", 
     },
     {
       title: "THE ART <br /> OF DETAIL",
       subtitle: "Boutique Accessories",
-      img: "https://images.unsplash.com/photo-1547996160-81dfa63595aa?q=80&w=2000&auto=format&fit=crop",
+      img: "https://images.unsplash.com/photo-1547996160-81dfa63595aa",
     },
     {
       title: "SCULPTED <br /> SPACES",
       subtitle: "Architectural Living",
-      img: "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?q=80&w=2000&auto=format&fit=crop",
+      img: "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d",
     },
     {
       title: "MODERN <br /> COUTURE",
       subtitle: "Tailored Collection",
-      img: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2000&auto=format&fit=crop",
+      img: "https://images.unsplash.com/photo-1441986300917-64674bd600d8",
     },
   ];
 
@@ -47,15 +48,21 @@ export default function ShopHomePage() {
               key={index}
               className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentSlide ? "opacity-100 z-10" : "opacity-0 z-0"}`}
             >
-              <Link href="/products">
-                <img
-                  src={slide.img}
+              <Link
+                href="/products"
+                className="relative block w-full h-full cursor-pointer overflow-hidden group"
+              >
+                <Image
+                  src={`${slide.img}?q=80&w=2000&auto=format&fit=crop`}
                   alt={slide.subtitle}
-                  className="w-full h-full object-cover brightness-[0.65] cursor-pointer hover:scale-110 transition-transform duration-6000 ease-out"
+                  fill
+                  className="object-cover brightness-[0.65] group-hover:scale-110 transition-transform duration-6000 ease-out"
+                  priority={index === 0}
+                  sizes="100vw"
                 />
               </Link>
 
-              <div className="absolute inset-0 flex flex-col justify-center px-6 sm:px-12 md:px-24 pointer-events-none">
+              <div className="absolute inset-0 flex flex-col justify-center px-6 sm:px-12 md:px-24 pointer-events-none z-20">
                 <div
                   className={
                     index === currentSlide
@@ -118,22 +125,22 @@ export default function ShopHomePage() {
             {
               name: "Electronics",
               slug: "electronics",
-              img: "https://images.unsplash.com/photo-1498049794561-7780e7231661?q=80&w=1000&auto=format&fit=crop",
+              img: "https://images.unsplash.com/photo-1498049794561-7780e7231661",
             },
             {
               name: "Accessories",
               slug: "accessories",
-              img: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?q=80&w=1000&auto=format&fit=crop",
+              img: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338",
             },
             {
               name: "Furniture",
               slug: "furniture",
-              img: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=80&w=1000&auto=format&fit=crop",
+              img: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7",
             },
             {
               name: "Clothing",
               slug: "clothing",
-              img: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?q=80&w=1000&auto=format&fit=crop",
+              img: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b",
             },
           ].map((cat, i) => (
             <Link
@@ -142,10 +149,13 @@ export default function ShopHomePage() {
               className="group block"
             >
               <div className="relative aspect-4/5 overflow-hidden rounded-4xl md:rounded-[2.5rem] mb-4 md:mb-6 bg-[#F5F3FF] shadow-lg shadow-purple-100/50">
-                <img
-                  src={cat.img}
+                <Image
+                  src={`${cat.img}?q=80&w=800&auto=format&fit=crop`}
                   alt={cat.name}
+                  width={400} 
+                  height={500} 
                   className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                  sizes="(max-width: 768px) 50vw, 25vw"
                 />
                 <div className="absolute inset-0 bg-linear-to-t from-[#4C1D95]/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
