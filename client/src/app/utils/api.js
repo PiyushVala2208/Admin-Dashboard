@@ -3,6 +3,7 @@ import axios from "axios";
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api",
   timeout: 10000,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
@@ -11,7 +12,9 @@ const api = axios.create({
 const getAuthToken = () => {
   if (typeof window === "undefined") return null;
   const match = document.cookie.match(new RegExp("(^| )token=([^;]+)"));
-  return match ? match[2] : localStorage.getItem("token");
+  const token = match ? match[2] : localStorage.getItem("token");
+  console.log("Current Token:", token);
+  return token;
 };
 
 api.interceptors.request.use(
@@ -38,13 +41,13 @@ api.interceptors.response.use(
           const path = window.location.pathname;
 
           if (path !== "/login" && path !== "/signup") {
-            console.warn("Session Expired. Cleaning up... API 401 on", response.config.url);
+            console.warn("Session Expired. Cleaning up...");
 
             document.cookie =
               "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
-
             localStorage.removeItem("token");
             localStorage.removeItem("user");
+
             window.location.href = "/login";
           }
         }
