@@ -5,38 +5,36 @@ export function middleware(request) {
   const userCookie = request.cookies.get("user")?.value;
   const { pathname } = request.nextUrl;
 
-  const protectedPaths = [
-    "/dashboard",
-    "/users",
-    "/inventory",
-    "/settings",
-    "/profile",
-    "/checkout",
-  ];
-  const isAdminPage = protectedPaths.some((path) => pathname.startsWith(path));
+  const authPaths = ["/login", "/register"];
+  const isAuthPage = authPaths.some((path) => pathname.startsWith(path));
 
-  const isAuthPage =
-    pathname.startsWith("/login") || pathname.startsWith("/register");
+  const adminStrictPaths = ["/dashboard", "/users", "/inventory", "/settings"];
+  const isStrictAdminPath = adminStrictPaths.some((path) =>
+    pathname.startsWith(path),
+  );
+
+  const generalProtectedPaths = ["/profile", "/checkout"];
+  const isProtectedPage =
+    isStrictAdminPath ||
+    generalProtectedPaths.some((path) => pathname.startsWith(path));
 
   if (isAuthPage && token) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  if (isAdminPage && !token) {
+  if (isProtectedPage && !token) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  const onlyAdminPaths = ["/dashboard", "/users", "/inventory", "/settings"];
-  const isStrictAdminPath = onlyAdminPaths.some((path) =>
-    pathname.startsWith(path),
-  );
-
   if (isStrictAdminPath && token) {
     try {
-      if (!userCookie)
-        return NextResponse.redirect(new URL("/login", request.url));
+      if (!userCookie) {
+        const response = NextResponse.redirect(new URL("/login", request.url));
+        response.cookies.delete("token");
+        return response;
+      }
 
       const userData = JSON.parse(decodeURIComponent(userCookie));
 
@@ -44,7 +42,7 @@ export function middleware(request) {
         return NextResponse.redirect(new URL("/", request.url));
       }
     } catch (error) {
-      console.error("Middleware Cookie Parse Error:", error);
+      console.error("Middleware Auth Error:", error);
       const response = NextResponse.redirect(new URL("/login", request.url));
       response.cookies.delete("token");
       response.cookies.delete("user");
