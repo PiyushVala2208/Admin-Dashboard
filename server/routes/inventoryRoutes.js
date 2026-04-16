@@ -8,5 +8,6 @@ router.post("/", protect, inventoryController.handleCreateItem);
 router.get("/:id", protect, inventoryController.handleGetOneItem);
 router.put("/:id", protect, inventoryController.handleUpdateItem);
 router.delete("/:id", protect, inventoryController.handleDeleteItem);
+router.delete("/variant/:id", protect, inventoryController.handleDeleteVariant);
 
 module.exports = router;
