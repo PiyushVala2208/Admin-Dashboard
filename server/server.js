@@ -10,6 +10,7 @@ const authRoute = require("./routes/authRoutes");
 const productRoute = require("./routes/productRoutes");
 const orderRoute = require("./routes/orderRoutes");
 const addressRoute = require("./routes/addressRoutes");
+const categoryRoutes = require("./routes/categoryRoutes")
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -38,6 +39,7 @@ app.use("/api/inventory", inventoryRoute);
 app.use("/api/products", productRoute);
 app.use("/api/orders", orderRoute);
 app.use("/api/addresses", addressRoute);
+app.use("/api/categories", categoryRoutes);
 
 app.use((err, req, res, next) => {
   const status = err.statusCode || 500;
