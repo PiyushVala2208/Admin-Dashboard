@@ -1,22 +1,29 @@
 const pool = require("../db");
 
-// 1. Get all items
 const getAllItems = async (userId) => {
   const query = `
     SELECT i.*, 
-    COALESCE(json_agg(pv.*) FILTER (WHERE pv.id IS NOT NULL), '[]') as variants 
+    COALESCE(
+      json_agg(
+        pv.* ORDER BY pv.is_default DESC, pv.id ASC
+      ) FILTER (WHERE pv.id IS NOT NULL), '[]'
+    ) as variants 
     FROM inventory i 
     LEFT JOIN product_variants pv ON i.id = pv.product_id 
     WHERE i.user_id = $1 
-    GROUP BY i.id`;
+    GROUP BY i.id
+    ORDER BY i.id DESC`;
   return await pool.query(query, [userId]);
 };
 
-// 2. Get single item
 const getItemById = async (id, userId) => {
   const query = `
     SELECT i.*, 
-    COALESCE(json_agg(pv.*) FILTER (WHERE pv.id IS NOT NULL), '[]') as variants 
+    COALESCE(
+      json_agg(
+        pv.* ORDER BY pv.is_default DESC
+      ) FILTER (WHERE pv.id IS NOT NULL), '[]'
+    ) as variants 
     FROM inventory i 
     LEFT JOIN product_variants pv ON i.id = pv.product_id 
     WHERE i.id = $1 AND i.user_id = $2 
@@ -24,7 +31,6 @@ const getItemById = async (id, userId) => {
   return await pool.query(query, [id, userId]);
 };
 
-// 3. Create Main Product
 const createItem = async (
   client,
   name,
@@ -32,13 +38,11 @@ const createItem = async (
   description,
   userId,
   image,
-  base_price,
-  stock,
   hasVariants,
 ) => {
   const query = `
-    INSERT INTO inventory (name, category, description, user_id, image, base_price, stock, has_variants) 
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+    INSERT INTO inventory (name, category, description, user_id, image, has_variants) 
+    VALUES ($1, $2, $3, $4, $5, $6) 
     RETURNING id`;
 
   return await client.query(query, [
@@ -47,80 +51,87 @@ const createItem = async (
     description,
     userId,
     image || null,
-    base_price || 0,
-    stock || 0,
-    hasVariants,
+    hasVariants || false,
   ]);
 };
 
-// 4. Create Product Variant (Same, mapping price -> variant_price)
-const createVariant = async (client, productId, variant) => {
-  const { size, color, price, stock, sku, image } = variant;
+const createVariant = async (client, productId, variant, isDefault = false) => {
+  const { size, color, variant_price, variant_stock, sku, variant_image } =
+    variant;
+
   const query = `
-    INSERT INTO product_variants (product_id, size, color, variant_price, variant_stock, sku, variant_image) 
-    VALUES ($1, $2, $3, $4, $5, $6, $7)`;
+    INSERT INTO product_variants (
+      product_id, size, color, variant_price, variant_stock, sku, variant_image, is_default
+    ) 
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    RETURNING *`;
 
   return await client.query(query, [
     productId,
     size || null,
     color || null,
-    price || 0,
-    stock || 0,
-    sku || null,
-    image || null,
+    parseFloat(variant_price) || 0,
+    parseInt(variant_stock) || 0,
+    sku || `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    variant_image || null,
+    isDefault,
   ]);
 };
 
-// 5. Update Item & variants
 const updateItem = async (
+  client,
   id,
   name,
   category,
   description,
   userId,
   image,
-  base_price,
-  stock,
-  variants,
+  hasVariants,
 ) => {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
+  const query = `
+    UPDATE inventory 
+    SET name=$1, category=$2, description=$3, image=$4, has_variants=$5
+    WHERE id=$6 AND user_id=$7
+    RETURNING *`;
 
-    await client.query(
-      "UPDATE inventory SET name=$1, category=$2, description=$3, image=$4, base_price=$5, stock=$6 WHERE id=$7 AND user_id=$8",
-      [name, category, description, image, base_price, stock, id, userId],
-    );
+  return await client.query(query, [
+    name,
+    category,
+    description,
+    image || null,
+    hasVariants,
+    id,
+    userId,
+  ]);
+};
 
-    await client.query("DELETE FROM product_variants WHERE product_id = $1", [
-      id,
-    ]);
+const updateVariant = async (client, variantId, variant) => {
+  const {
+    size,
+    color,
+    variant_price,
+    variant_stock,
+    sku,
+    variant_image,
+    is_default,
+  } = variant;
 
-    if (variants && variants.length > 0) {
-      for (const variant of variants) {
-        const variantQuery = `
-          INSERT INTO product_variants (product_id, size, color, variant_price, variant_stock, sku, variant_image) 
-          VALUES ($1, $2, $3, $4, $5, $6, $7)`;
-        await client.query(variantQuery, [
-          id,
-          variant.size,
-          variant.color,
-          variant.variant_price,
-          variant.variant_stock,
-          variant.sku,
-          variant.variant_image,
-        ]);
-      }
-    }
+  const query = `
+      UPDATE product_variants 
+      SET size=$1, color=$2, variant_price=$3, variant_stock=$4, sku=$5, variant_image=$6, is_default=$7
+      WHERE id=$8
+      RETURNING *`;
 
-    await client.query("COMMIT");
-    return { success: true };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  return await client.query(query, [
+    size || null,
+    color || null,
+    parseFloat(variant_price) || 0,
+    parseInt(variant_stock) || 0,
+    sku || null,
+    variant_image || null,
+    is_default || false,
+    variantId,
+  ]);
 };
 
 const deleteItem = async (id, userId) => {
@@ -138,7 +149,6 @@ const deleteVariant = async (variantId, userId) => {
   `;
 
   const checkResult = await pool.query(checkQuery, [variantId, userId]);
-
   if (checkResult.rows.length === 0) {
     throw new Error("Variant not found or unauthorized");
   }
@@ -154,6 +164,7 @@ module.exports = {
   createItem,
   createVariant,
   updateItem,
+  updateVariant,
   deleteItem,
   deleteVariant,
 };

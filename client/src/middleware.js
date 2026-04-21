@@ -31,7 +31,7 @@ export function middleware(request) {
   if (isStrictAdminPath && token) {
     try {
       if (!userCookie) {
-        const response = NextResponse.redirect(new URL("/login", request.url));
+        const response = NextResponse.redirect(new URL("/", request.url));
         response.cookies.delete("token");
         return response;
       }
@@ -43,7 +43,7 @@ export function middleware(request) {
       }
     } catch (error) {
       console.error("Middleware Auth Error:", error);
-      const response = NextResponse.redirect(new URL("/login", request.url));
+      const response = NextResponse.redirect(new URL("/", request.url));
       response.cookies.delete("token");
       response.cookies.delete("user");
       return response;

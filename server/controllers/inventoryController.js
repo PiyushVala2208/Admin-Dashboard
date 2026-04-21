@@ -1,7 +1,6 @@
 const inventoryModel = require("../models/inventoryModel");
 const pool = require("../db");
 
-// 1. Get all items
 const handleGetItems = async (req, res) => {
   try {
     const result = await inventoryModel.getAllItems(req.user.id);
@@ -12,7 +11,6 @@ const handleGetItems = async (req, res) => {
   }
 };
 
-// 2. Get single item
 const handleGetOneItem = async (req, res) => {
   const { id } = req.params;
   try {
@@ -26,18 +24,9 @@ const handleGetOneItem = async (req, res) => {
   }
 };
 
-// 3. Create Item with Variants
 const handleCreateItem = async (req, res) => {
-  const {
-    name,
-    category,
-    description,
-    image,
-    base_price,
-    stock, 
-    hasVariants,
-    variants,
-  } = req.body;
+  const { name, category, description, image, hasVariants, variants } =
+    req.body;
   const userId = req.user.id;
 
   const client = await pool.connect();
@@ -51,28 +40,29 @@ const handleCreateItem = async (req, res) => {
       description,
       userId,
       image || null,
-      base_price || 0,
-      stock || 0, 
       hasVariants,
     );
     const productId = productResult.rows[0].id;
 
-    if (hasVariants && variants && Array.isArray(variants)) {
-      for (const variant of variants) {
-        await inventoryModel.createVariant(client, productId, variant);
+    if (variants && Array.isArray(variants)) {
+      for (let i = 0; i < variants.length; i++) {
+        const isDefault = i === 0;
+        await inventoryModel.createVariant(
+          client,
+          productId,
+          variants[i],
+          isDefault,
+        );
       }
     }
 
     await client.query("COMMIT");
     res
       .status(201)
-      .json({
-        message: "Product and variants added successfully!",
-        id: productId,
-      });
+      .json({ message: "Product added successfully!", id: productId });
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("❌ DB Insert Error:", err.message);
+    console.error("DB Insert Error:", err.message);
     res
       .status(500)
       .json({ message: "Error adding product", error: err.message });
@@ -81,49 +71,66 @@ const handleCreateItem = async (req, res) => {
   }
 };
 
-// 4. Update Item
 const handleUpdateItem = async (req, res) => {
   const { id } = req.params;
-  const { name, category, description, image, base_price, variants } = req.body;
+  const { name, category, description, image, hasVariants, variants } =
+    req.body;
   const userId = req.user.id;
 
+  const client = await pool.connect();
   try {
+    await client.query("BEGIN");
+
     await inventoryModel.updateItem(
+      client,
       id,
       name,
       category,
       description,
       userId,
-      image,
-      base_price,
-      variants,
+      image || null,
+      hasVariants,
     );
 
-    const freshResult = await inventoryModel.getItemById(id, userId);
+    if (variants && Array.isArray(variants)) {
+      for (let i = 0; i < variants.length; i++) {
+        const variant = variants[i];
 
-    if (freshResult.rows.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "Item updated but could not be retrieved" });
+        variant.is_default = i === 0;
+
+        if (variant.id) {
+          await inventoryModel.updateVariant(client, variant.id, variant);
+        } else {
+          await inventoryModel.createVariant(
+            client,
+            id,
+            variant,
+            variant.is_default,
+          );
+        }
+      }
     }
 
+    await client.query("COMMIT");
+    const freshResult = await inventoryModel.getItemById(id, userId);
     res.json(freshResult.rows[0]);
   } catch (err) {
+    await client.query("ROLLBACK");
     console.error("Update Controller Error:", err.message);
     res
       .status(500)
       .json({ message: "Error updating item", error: err.message });
+  } finally {
+    client.release();
   }
 };
 
-// 5. Delete Item
 const handleDeleteItem = async (req, res) => {
   const { id } = req.params;
   try {
     const result = await inventoryModel.deleteItem(id, req.user.id);
-    if (result.rowCount === 0) {
+    if (result.rowCount === 0)
       return res.status(404).json({ message: "Item not found" });
-    }
     res.json({ message: "Item deleted successfully!" });
   } catch (err) {
     res.status(500).send("Error deleting item");
@@ -132,23 +139,15 @@ const handleDeleteItem = async (req, res) => {
 
 const handleDeleteVariant = async (req, res) => {
   const { id } = req.params;
-  const userId = req.user.id;
-
   try {
-    const result = await inventoryModel.deleteVariant(id, userId);
-
-    if (result.rowCount === 0) {
-      return res
-        .status(404)
-        .json({ message: "Variant not found or not authorized" });
-    }
+    const result = await inventoryModel.deleteVariant(id, req.user.id);
+    if (result.rowCount === 0)
+      return res.status(404).json({ message: "Variant not found" });
     res.json({ message: "Variant deleted successfully!" });
   } catch (err) {
-    console.error("Delete Variant Error:", err.message);
-    res.status(500).json({
-      message: "Error deleting variant",
-      error: err.message,
-    });
+    res
+      .status(500)
+      .json({ message: "Error deleting variant", error: err.message });
   }
 };
 
