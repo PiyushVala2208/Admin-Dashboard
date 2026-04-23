@@ -1,7 +1,8 @@
 import { Geist, Geist_Mono } from "next/font/google";
-import "../globals.css"
+import "../globals.css";
 import Sidebar from "@/components/Sidebar";
 import Navbar from "@/components/Navbar";
+import { CategoryProvider } from "@/context/CategoryContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,16 +21,14 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    
-        <div className="flex h-screen overflow-hidden">
-          <Sidebar />
-          <div className="flex flex-col flex-1 overflow-hidden">
-            <Navbar />
-            <main className="flex-1 overflow-y-auto p-5">
-              {children}
-            </main>
-          </div>
+    <CategoryProvider>
+      <div className="flex h-screen overflow-hidden bg-slate-50">
+        <Sidebar />
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <Navbar />
+          <main className="flex-1 overflow-y-auto p-5">{children}</main>
         </div>
-     
+      </div>
+    </CategoryProvider>
   );
 }

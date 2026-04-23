@@ -1,14 +1,17 @@
 "use client";
+
 import React, {
   createContext,
-  useContext,
-  useState,
-  useEffect,
   useCallback,
+  useContext,
+  useEffect,
+  useState,
 } from "react";
-import axios from "axios";
+import api from "@/app/utils/api";
 
 const CategoryContext = createContext();
+
+const normalizeCategoryName = (value = "") => value.trim().toLowerCase();
 
 export const CategoryProvider = ({ children }) => {
   const [categories, setCategories] = useState([]);
@@ -17,14 +20,17 @@ export const CategoryProvider = ({ children }) => {
   const refreshCategories = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/categories`,
-      );
-      if (response.data.success) {
-        setCategories(response.data.data);
-      }
+      const response = await api.get("/categories");
+      const nextCategories = Array.isArray(response.data?.data)
+        ? response.data.data
+        : Array.isArray(response.data)
+          ? response.data
+          : [];
+
+      setCategories(nextCategories);
     } catch (error) {
-      console.error("Error fetching categories:", error);
+      console.error("Failed to load categories:", error);
+      setCategories([]);
     } finally {
       setLoading(false);
     }
@@ -34,9 +40,40 @@ export const CategoryProvider = ({ children }) => {
     refreshCategories();
   }, [refreshCategories]);
 
-  const getCategoryAttributes = (categoryId) => {
-    const cat = categories.find((c) => c.id === parseInt(categoryId));
-    return cat ? cat.attributes : [];
+  const findCategoryByName = (name) => {
+    const normalizedName = normalizeCategoryName(name);
+
+    return categories.find(
+      (category) => normalizeCategoryName(category.name) === normalizedName,
+    );
+  };
+
+  const getCategorySuggestions = (query = "") => {
+    const normalizedQuery = normalizeCategoryName(query);
+
+    if (!normalizedQuery) {
+      return categories;
+    }
+
+    return categories.filter((category) =>
+      normalizeCategoryName(category.name).includes(normalizedQuery),
+    );
+  };
+
+  const getCategoryAttributes = (categoryIdOrName) => {
+    if (!categoryIdOrName) return [];
+
+    const matchedCategory = categories.find((category) => {
+      return (
+        String(category.id) === String(categoryIdOrName) ||
+        normalizeCategoryName(category.name) ===
+          normalizeCategoryName(categoryIdOrName)
+      );
+    });
+
+    return Array.isArray(matchedCategory?.attributes)
+      ? matchedCategory.attributes
+      : [];
   };
 
   return (
@@ -45,6 +82,8 @@ export const CategoryProvider = ({ children }) => {
         categories,
         loading,
         refreshCategories,
+        findCategoryByName,
+        getCategorySuggestions,
         getCategoryAttributes,
       }}
     >
@@ -55,8 +94,10 @@ export const CategoryProvider = ({ children }) => {
 
 export const useCategories = () => {
   const context = useContext(CategoryContext);
+
   if (!context) {
     throw new Error("useCategories must be used within a CategoryProvider");
   }
+
   return context;
 };
