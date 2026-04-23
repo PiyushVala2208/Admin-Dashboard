@@ -16,6 +16,15 @@ const getAuthToken = () => {
   return token;
 };
 
+const clearClientSession = () => {
+  if (typeof window === "undefined") return;
+
+  document.cookie =
+    "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax;";
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+};
+
 api.interceptors.request.use(
   (config) => {
     const token = getAuthToken();
@@ -39,20 +48,19 @@ api.interceptors.response.use(
         if (typeof window !== "undefined") {
           const path = window.location.pathname;
 
-          if (path !== "/login" && path !== "/signup") {
-            console.warn("Session expired or invalid. Clearing storage...");
-
-            document.cookie =
-              "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax;";
-
-            localStorage.removeItem("token");
-            localStorage.removeItem("user");
-
+          if (path !== "/login" && path !== "/signup" && path !== "/register") {
+            clearClientSession();
             window.location.replace("/login");
           }
         }
       }
-      return Promise.reject(response.data);
+
+      return Promise.reject(
+        response.data || {
+          message: "Request failed.",
+          status: response.status,
+        },
+      );
     }
 
     return Promise.reject({
