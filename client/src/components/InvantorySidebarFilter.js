@@ -1,16 +1,18 @@
 import { Check, XCircle } from "lucide-react";
 
 export default function SidebarFilter({
-  categories = [],
+  categories = [], 
   activeFilters,
   setActiveFilters,
 }) {
   const toggleCategory = (cat) => {
+    const catName = typeof cat === "object" ? cat.name : cat;
+
     setActiveFilters((prev) => ({
       ...prev,
-      category: prev.category.includes(cat)
-        ? prev.category.filter((c) => c !== cat)
-        : [...prev.category, cat],
+      category: prev.category.includes(catName)
+        ? prev.category.filter((c) => c !== catName)
+        : [...prev.category, catName],
     }));
   };
 
@@ -70,23 +72,30 @@ export default function SidebarFilter({
           Categories
         </h3>
         <div className="space-y-1">
-          {categories.map((cat) => {
-            const isSelected = activeFilters.category.includes(cat);
+          {categories.map((cat, index) => {
+            // DB se data handle karne ke liye
+            const catName = typeof cat === "object" ? cat.name : cat;
+            const isSelected = activeFilters.category.includes(catName);
+            
             return (
               <button
-                key={cat}
-                onClick={() => toggleCategory(cat)}
+                key={typeof cat === "object" ? cat.id : index}
+                onClick={() => toggleCategory(catName)}
                 className={`w-full text-left text-xs py-2.5 px-3 rounded-lg flex justify-between items-center transition-all ${
                   isSelected
                     ? "bg-purple-50 text-purple-600 font-bold shadow-sm ring-1 ring-purple-100"
                     : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
                 }`}
               >
-                {cat}
+                {catName}
                 {isSelected && <Check size={14} className="text-purple-600" />}
               </button>
             );
           })}
+          
+          {categories.length === 0 && (
+            <p className="text-[10px] text-slate-400 italic pl-3">No categories available</p>
+          )}
         </div>
       </div>
     </aside>
