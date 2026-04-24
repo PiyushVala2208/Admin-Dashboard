@@ -100,6 +100,30 @@ export default function ItemInfoPage() {
     }
   };
 
+  const handleUpdateSuccess = (updated) => {
+    const prevColor = selectedColor;
+    const prevSize = selectedVariant?.size;
+
+    setItem(updated);
+
+    if (updated.has_variants && updated.variants?.length > 0) {
+      const matchedVar = updated.variants.find(
+        (v) => v.color === prevColor && v.size === prevSize,
+      );
+
+      if (matchedVar) {
+        setSelectedColor(matchedVar.color);
+        setSelectedVariant(matchedVar);
+      } else {
+        const defaultVar =
+          updated.variants.find((v) => v.is_default) || updated.variants[0];
+        setSelectedColor(defaultVar.color);
+        setSelectedVariant(defaultVar);
+      }
+    }
+    setIsEditModalOpen(false);
+  };
+
   if (loading)
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -113,7 +137,7 @@ export default function ItemInfoPage() {
     item.variants?.find((variant) => variant.is_default) ||
     item.variants?.[0] ||
     null;
-    
+
   const activeVariant = selectedVariant || defaultVariant;
 
   const displayPrice =
@@ -197,19 +221,33 @@ export default function ItemInfoPage() {
                         Select Color
                       </h3>
                       <div className="flex flex-wrap gap-3">
-                        {uniqueColors.map((color) => (
-                          <button
-                            key={color}
-                            onClick={() => handleColorChange(color)}
-                            className={`px-5 py-2 rounded-2xl text-xs font-bold transition-all border-2 ${
-                              selectedColor === color
-                                ? "border-blue-600 bg-blue-50 text-blue-700 scale-105 shadow-md"
-                                : "border-slate-100 bg-white text-slate-500 hover:border-slate-300"
-                            }`}
-                          >
-                            {color}
-                          </button>
-                        ))}
+                        {uniqueColors.map((color) => {
+                          const hasLowStockInColor = item.variants.some(
+                            (v) => v.color === color && v.variant_stock <= 10,
+                          );
+                          return (
+                            <button
+                              key={color}
+                              onClick={() => handleColorChange(color)}
+                              className={`relative px-5 py-2 rounded-2xl text-xs font-bold transition-all border-2 ${
+                                selectedColor === color
+                                  ? "border-blue-600 bg-blue-50 text-blue-700 scale-105 shadow-md"
+                                  : hasLowStockInColor
+                                    ? "border-red-100 bg-white text-slate-500 hover:border-red-200"
+                                    : "border-slate-100 bg-white text-slate-500 hover:border-slate-300"
+                              }`}
+                            >
+                              {color}
+
+                              {hasLowStockInColor && (
+                                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -217,20 +255,32 @@ export default function ItemInfoPage() {
                       <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">
                         Available Sizes
                       </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {availableSizes.map((v) => (
-                          <button
-                            key={v.id}
-                            onClick={() => setSelectedVariant(v)}
-                            className={`min-w-[48px] h-12 flex items-center justify-center rounded-xl text-sm font-bold transition-all border-2 ${
-                              selectedVariant?.id === v.id
-                                ? "bg-slate-900 text-white border-slate-900 shadow-lg"
-                                : "bg-white text-slate-600 border-slate-100 hover:border-blue-400"
-                            }`}
-                          >
-                            {v.size}
-                          </button>
-                        ))}
+                      <div className="flex flex-wrap gap-3">
+                        {availableSizes.map((v) => {
+                          const isLow = v.variant_stock <= 10;
+                          return (
+                            <button
+                              key={v.id}
+                              onClick={() => setSelectedVariant(v)}
+                              className={`relative min-w-14 h-14 flex flex-col items-center justify-center rounded-xl text-sm font-bold transition-all border-2 ${
+                                selectedVariant?.id === v.id
+                                  ? "bg-slate-900 text-white border-slate-900 shadow-lg"
+                                  : isLow
+                                    ? "bg-red-50 text-red-600 border-red-200 hover:border-red-400"
+                                    : "bg-white text-slate-600 border-slate-100 hover:border-blue-400"
+                              }`}
+                            >
+                              <span>{v.size}</span>
+                              {isLow && (
+                                <span
+                                  className={`text-[8px] absolute -bottom-2 px-1 rounded bg-red-600 text-white leading-tight ${selectedVariant?.id === v.id ? "opacity-100" : "opacity-80"}`}
+                                >
+                                  LOW
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -294,17 +344,29 @@ export default function ItemInfoPage() {
             <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400 mb-6">
               <History size={16} className="text-blue-400" /> Activity & Summary
             </h3>
+
             <div className="space-y-4">
               <div className="flex justify-between py-3 border-b border-white/10">
                 <span className="text-[10px] text-slate-500 uppercase font-bold">
                   Status
                 </span>
                 <span
-                  className={`text-[10px] font-black px-2 py-0.5 rounded ${displayStock > 5 ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}
+                  className={`text-[10px] font-black px-2 py-0.5 rounded ${
+                    displayStock > 10
+                      ? "bg-green-500/20 text-green-400"
+                      : displayStock > 0
+                        ? "bg-yellow-500/20 text-yellow-400"
+                        : "bg-red-500/20 text-red-400"
+                  }`}
                 >
-                  {displayStock > 5 ? "OPTIMAL" : "CRITICAL"}
+                  {displayStock > 10
+                    ? "IN STOCK"
+                    : displayStock > 0
+                      ? "LOW STOCK"
+                      : "OUT OF STOCK"}
                 </span>
               </div>
+
               <div className="flex justify-between py-3">
                 <span className="text-[10px] text-slate-500 uppercase font-bold">
                   Total Variants
@@ -314,6 +376,14 @@ export default function ItemInfoPage() {
                 </span>
               </div>
             </div>
+            {displayStock <= 10 && displayStock > 0 && (
+              <div className="p-3 bg-red-500/10 rounded-xl border border-red-500/20">
+                <p className="text-[10px] text-red-400 font-bold leading-tight">
+                  Warning: This variant needs a restock soon. Only{" "}
+                  {displayStock} units left.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="p-6 bg-slate-50 rounded-[2.5rem] border border-slate-100 space-y-4 shadow-sm">
@@ -342,7 +412,7 @@ export default function ItemInfoPage() {
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         item={item}
-        onUpdate={(updated) => setItem(updated)}
+        onUpdate={handleUpdateSuccess}
       />
     </div>
   );

@@ -1,3 +1,4 @@
+"use client";
 import Image from "next/image";
 import { Pencil, Trash2, Package } from "lucide-react";
 import { useSettings } from "@/context/SettingsContext";
@@ -8,6 +9,8 @@ export default function InventoryTable({
   handleEdit,
   handleDelete,
   router,
+  calculateTotalStock,
+  getDisplayPrice,
 }) {
   const { currencySymbol } = useSettings();
 
@@ -16,7 +19,7 @@ export default function InventoryTable({
       <table className="w-full text-sm text-left">
         <thead className="bg-slate-50 text-slate-600 border-b border-slate-100">
           <tr>
-            <th className="p-4 font-semibold uppercase tracking-wider w-24">
+            <th className="p-4 font-semibold uppercase tracking-wider w-32">
               Preview
             </th>
             <th className="p-4 font-semibold uppercase tracking-wider">
@@ -41,34 +44,31 @@ export default function InventoryTable({
         </thead>
         <tbody className="divide-y divide-slate-100">
           {data.map((item) => {
-            const totalStock =
-              item.has_variants && item.variants?.length > 0
-                ? item.variants.reduce(
-                    (acc, curr) => acc + (Number(curr.variant_stock) || 0),
-                    0,
-                  )
-                : Number(item.stock) || 0;
-
+            const totalStock = calculateTotalStock(item);
+            const displayPrice = getDisplayPrice(item);
             const status = getStatus(totalStock);
+            const variantsArray = item.variants || [];
 
-            let displayPrice = 0;
-            if (item.has_variants && item.variants?.length > 0) {
-              // Variants mein se sabse minimum price nikal rahe hain (Starting price)
-              const variantPrices = item.variants
-                .map((v) => Number(v.variant_price))
-                .filter((p) => p > 0);
-              displayPrice =
-                variantPrices.length > 0 ? Math.min(...variantPrices) : 0;
-            } else {
-              displayPrice = Number(item.base_price || item.price || 0);
-            }
+            const colorGroups = {};
 
-            const variantImages = item.has_variants
-              ? item.variants.map((v) => v.variant_image).filter((img) => img)
-              : [];
+            variantsArray.forEach((v) => {
+              const colorName = (v.color || "default").trim().toLowerCase();
+              if (!colorGroups[colorName]) {
+                colorGroups[colorName] = v.variant_image || null;
+              }
+            });
 
-            const displayImages = variantImages.slice(0, 3);
-            const remainingCount = variantImages.length - 3;
+            const uniqueColorImages = Object.values(colorGroups).filter(
+              (img) => img !== null,
+            );
+
+            const variantDisplayCount = Object.keys(colorGroups).length;
+
+            const displayImages = uniqueColorImages.slice(0, 3);
+            const remainingCount = uniqueColorImages.length - 3;
+            const mainDisplayImage =
+              item.image ||
+              (uniqueColorImages.length > 0 ? uniqueColorImages[0] : null);
 
             return (
               <tr
@@ -78,34 +78,56 @@ export default function InventoryTable({
               >
                 <td className="p-4">
                   <div className="flex items-center">
-                    {item.has_variants && variantImages.length > 0 ? (
-                      <div className="flex -space-x-5 isolate">
+                    {uniqueColorImages.length > 1 ? (
+                      <div className="flex -space-x-5 isolate items-center">
                         {displayImages.map((img, idx) => (
                           <div
                             key={idx}
-                            className="relative w-10 h-10 rounded-xl border-2 border-white shadow-sm overflow-hidden bg-slate-50 transition-all duration-300 hover:scale-125 hover:z-50 hover:shadow-lg"
-                            style={{ zIndex: 10 - idx }}
+                            className="relative w-12 h-12 rounded-xl border-2 border-white shadow-sm overflow-hidden bg-slate-50 transition-all duration-300 ease-in-out hover:scale-122 hover:shadow-xl hover:-translate-y-1"
+                            style={{
+                              zIndex: 10 - idx,
+                              "--hover-z-index": 100,
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.zIndex = "100";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.zIndex = `${10 - idx}`;
+                            }}
                           >
                             <Image
                               src={img}
-                              alt="variant"
+                              alt="product color"
                               fill
                               className="object-cover"
                               sizes="40px"
                             />
                           </div>
                         ))}
+
                         {remainingCount > 0 && (
-                          <div className="relative w-10 h-10 rounded-xl border-2 border-white shadow-sm bg-slate-800 flex items-center justify-center text-[10px] text-white font-bold z-0">
+                          <div
+                            className="relative w-12 h-12 rounded-xl border-2 border-white shadow-sm bg-slate-800 flex items-center justify-center text-[10px] text-white font-black transition-all duration-300 ease-in-out hover:scale-110 hover:shadow-lg"
+                            style={{
+                              zIndex: 0,
+                              "--hover-z-index": 100,
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.zIndex = "100";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.zIndex = "0";
+                            }}
+                          >
                             +{remainingCount}
                           </div>
                         )}
                       </div>
                     ) : (
-                      <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-50 border border-slate-100 shadow-sm group-hover:border-purple-200 transition-all duration-500 group-hover:scale-110">
-                        {item.image ? (
+                      <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-50 border border-slate-100 shadow-sm group-hover:border-blue-200 transition-all duration-500 group-hover:scale-110">
+                        {mainDisplayImage ? (
                           <Image
-                            src={item.image}
+                            src={mainDisplayImage}
                             alt={item.name}
                             fill
                             className="object-cover"
@@ -123,38 +145,62 @@ export default function InventoryTable({
 
                 <td className="p-4 font-semibold text-slate-700">
                   <div className="flex flex-col">
-                    <span>{item.name}</span>
-                    {item.has_variants && (
-                      <span className="text-[9px] text-blue-500 font-bold uppercase tracking-tighter">
-                        {item.variants?.length} Variants
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <span>{item.name}</span>
+
+                      {item.has_critical && (
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col">
+                      {variantsArray.length > 0 && (
+                        <span className="text-[10px] text-blue-600 font-extrabold uppercase tracking-tight">
+                          {variantDisplayCount} Variants
+                        </span>
+                      )}
+
+                      {item.has_critical && (
+                        <span className="text-[8px] text-red-500 font-black uppercase">
+                          {item.critical_variants_count} Low Stock
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </td>
-                <td className="p-4 text-slate-500">{item.category}</td>
-                <td className="p-4">
-                  <span className="font-mono font-medium">{totalStock}</span>
+
+                <td className="p-4 text-slate-500 font-medium">
+                  {item.category}
                 </td>
+                <td className="p-4 font-mono font-bold text-slate-600">
+                  {totalStock}
+                </td>
+
                 <td className="p-4 font-bold text-slate-800">
                   <div className="flex flex-col">
                     <span>
                       {currencySymbol}
                       {displayPrice.toLocaleString()}
                     </span>
-                    {item.has_variants && (
+                    {variantsArray.length > 0 && (
                       <span className="text-[10px] text-slate-400 font-medium lowercase">
-                        (From)
+                        (Starting)
                       </span>
                     )}
                   </div>
                 </td>
+
                 <td className="p-4">
                   <span
-                    className={`px-3 py-1 text-[11px] font-bold rounded-full border ${status.color}`}
+                    className={`inline-flex items-center justify-center px-3 py-1 text-[10px] sm:text-[11px] font-bold rounded-full border leading-none ${status.color}`}
                   >
                     {status.label.toUpperCase()}
                   </span>
                 </td>
+
                 <td className="p-4 text-center">
                   <div className="flex justify-center gap-2">
                     <button

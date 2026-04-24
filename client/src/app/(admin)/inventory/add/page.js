@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Package2, Sparkles, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import api from "@/app/utils/api";
@@ -26,7 +26,23 @@ export default function AddItemPage() {
     categoryName: "",
     description: "",
   });
+
   const [variantGroups, setVariantGroups] = useState([createEmptyColorGroup()]);
+
+  const scrollAnchorRef = useRef(null);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (scrollAnchorRef.current) {
+        scrollAnchorRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "end",
+        });
+      }
+    }, 100);
+
+    return () => clearTimeout(timeout);
+  }, [variantGroups]);
 
   const trimmedCategoryName = formData.categoryName.trim();
   const categorySuggestions = getCategorySuggestions(
@@ -240,6 +256,7 @@ export default function AddItemPage() {
                 setVariantGroups={setVariantGroups}
                 productName={formData.name}
               />
+              <div ref={scrollAnchorRef} />
             </div>
 
             {formError ? (

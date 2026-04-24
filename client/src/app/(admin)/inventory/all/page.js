@@ -1,20 +1,20 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
-import { Package, Search, Pencil, Trash2, Plus } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Package, Search, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import api from "@/app/utils/api";
 import EditInventoryModal from "@/components/EditInventoryModal";
 import SidebarFilter from "@/components/InvantorySidebarFilter";
 import Pagination from "@/components/Pagination";
 import InventoryTable from "@/components/InventoryTable";
+import InventoryCard from "@/components/InventoryCard";
+import InventoryEmptyState from "@/components/InventoryEmptyState";
 import { useSettings } from "@/context/SettingsContext";
-
-const CATEGORIES = ["Electronics", "Accessories", "Furniture", "Clothing"];
 
 export default function AllItemsPage() {
   const router = useRouter();
   const [inventory, setInventory] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -27,6 +27,26 @@ export default function AllItemsPage() {
     category: [],
     criticalOnly: false,
   });
+
+  const calculateTotalStock = useCallback((item) => {
+    if (item.variants && item.variants.length > 0) {
+      return item.variants.reduce(
+        (acc, curr) => acc + (parseInt(curr.variant_stock) || 0),
+        0,
+      );
+    }
+    return 0;
+  }, []);
+
+  const getDisplayPrice = useCallback((item) => {
+    if (item.variants && item.variants.length > 0) {
+      const prices = item.variants
+        .map((v) => Number(v.variant_price))
+        .filter((p) => p > 0);
+      return prices.length > 0 ? Math.min(...prices) : 0;
+    }
+    return 0;
+  }, []);
 
   const getStatus = (stock) => {
     if (stock > 10)
@@ -45,20 +65,45 @@ export default function AllItemsPage() {
     };
   };
 
-  const fetchInventory = async () => {
+  const fetchData = async () => {
     try {
-      const response = await api.get("/inventory");
-      setInventory(response.data);
-      setLoading(false);
+      setLoading(true);
+
+      const inventoryUrl = activeFilters.criticalOnly
+        ? "/inventory?filter=critical"
+        : "/inventory";
+
+      const [invRes, catRes] = await Promise.all([
+        api.get(inventoryUrl),
+        api.get("/categories"),
+      ]);
+
+      const inventoryData = Array.isArray(invRes.data) ? invRes.data : [];
+      setInventory(inventoryData);
+
+      const dbCatNames = Array.isArray(catRes.data)
+        ? catRes.data.map((c) => c.name)
+        : [];
+
+      const inventoryCats = inventoryData
+        .map((item) => item.category)
+        .filter(Boolean);
+
+      const combinedCategories = [
+        ...new Set([...dbCatNames, ...inventoryCats]),
+      ];
+
+      setCategories(combinedCategories);
     } catch (error) {
-      console.error("Error fetching inventory:", error);
+      console.error("Error fetching data:", error);
+    } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchInventory();
-  }, []);
+    fetchData();
+  }, [activeFilters.criticalOnly]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -66,21 +111,28 @@ export default function AllItemsPage() {
 
   const filteredItems = useMemo(() => {
     return inventory.filter((item) => {
+      const totalStock = calculateTotalStock(item);
+      const itemName = item.name?.toLowerCase() || "";
+      const itemCat = item.category?.toLowerCase() || "";
+      const searchTerm = search.toLowerCase();
+
       const matchesSearch =
-        item.name.toLowerCase().includes(search.toLowerCase()) ||
-        item.category.toLowerCase().includes(search.toLowerCase());
+        itemName.includes(searchTerm) || itemCat.includes(searchTerm);
+
       const matchesCategory =
         activeFilters.category.length === 0 ||
         activeFilters.category.includes(item.category);
+
       const matchesCritical = activeFilters.criticalOnly
-        ? item.stock < 10
+        ? item.has_critical === true || item.has_critical === "true"
         : true;
 
       return matchesSearch && matchesCategory && matchesCritical;
     });
-  }, [inventory, search, activeFilters]);
+  }, [inventory, search, activeFilters, calculateTotalStock]);
 
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+
   const currentTableData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredItems.slice(startIndex, startIndex + itemsPerPage);
@@ -88,12 +140,17 @@ export default function AllItemsPage() {
 
   const handleDelete = async (e, id) => {
     e.stopPropagation();
-    if (!confirm("Are you sure you want to delete this item?")) return;
+    if (
+      !confirm(
+        "Are you sure? This will delete the product and all its variants forever.",
+      )
+    )
+      return;
     try {
       await api.delete(`/inventory/${id}`);
-      setInventory(inventory.filter((item) => item.id !== id));
+      setInventory((prev) => prev.filter((item) => item.id !== id));
     } catch (error) {
-      console.error("Delete failed:", error);
+      console.error("Delete error:", error);
       alert("Failed to delete item.");
     }
   };
@@ -104,16 +161,21 @@ export default function AllItemsPage() {
     setIsModalOpen(true);
   };
 
+  const handleUpdateSuccess = () => {
+    fetchData();
+    setIsModalOpen(false);
+  };
+
   if (loading)
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <div className="w-12 h-12 border-4 border-purple-600/20 border-t-purple-600 rounded-full animate-spin"></div>
-        <p className="font-bold text-slate-600">Loading Inventory...</p>
+        <p className="font-bold text-slate-600">Syncing Inventory...</p>
       </div>
     );
 
   return (
-    <div className="p-4 sm:p-6 lg:p-10 max-w-[1600px] mx-auto min-h-screen animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-full mx-auto min-h-screen animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
         <div className="space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-50 text-purple-600 text-xs font-bold uppercase tracking-wider mb-2">
@@ -123,12 +185,12 @@ export default function AllItemsPage() {
             Inventory Items
           </h1>
           <p className="text-slate-500 font-medium">
-            Manage and track your stock levels in real-time.
+            Manage and track your stock levels across all variants in real-time.
           </p>
         </div>
         <button
           onClick={() => router.push("/inventory/add")}
-          className="group flex items-center justify-center gap-2 bg-slate-900 text-white px-8 py-4 rounded-2xl hover:bg-purple-600 transition-all duration-300 font-bold shadow-xl shadow-slate-200 active:scale-95 w-full md:w-auto"
+          className="group flex items-center justify-center gap-2 bg-slate-900 text-white px-8 py-4 rounded-2xl hover:bg-purple-600 transition-all duration-300 font-bold shadow-xl active:scale-95 w-full md:w-auto"
         >
           <Plus
             size={20}
@@ -138,11 +200,11 @@ export default function AllItemsPage() {
         </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-10">
-        <div className="lg:w-72 shrink-0">
+      <div className="flex flex-col lg:flex-row gap-5">
+        <div className="lg:w-64 shrink-0">
           <div className="sticky top-8">
             <SidebarFilter
-              categories={CATEGORIES}
+              categories={categories}
               activeFilters={activeFilters}
               setActiveFilters={setActiveFilters}
             />
@@ -158,10 +220,7 @@ export default function AllItemsPage() {
             <input
               type="text"
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name or category..."
               className="w-full bg-white border-2 border-slate-100 pl-14 pr-6 rounded-2xl py-4 focus:outline-none focus:ring-8 focus:ring-purple-500/5 focus:border-purple-500 transition-all shadow-sm text-slate-700 font-medium"
             />
@@ -175,129 +234,34 @@ export default function AllItemsPage() {
                 handleEdit={handleEdit}
                 handleDelete={handleDelete}
                 router={router}
+                calculateTotalStock={calculateTotalStock}
+                getDisplayPrice={getDisplayPrice}
               />
             ) : (
-              <div className="bg-white shadow-xl shadow-slate-200/60 rounded-2xl border border-slate-100 overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
-                        Item Details
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
-                        Category
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
-                        Stock
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">
-                        Price
-                      </th>
-                      <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td colSpan="5" className="py-24 text-center">
-                        <div className="flex flex-col items-center justify-center">
-                          <div className="bg-slate-50 p-4 rounded-full mb-4">
-                            <Package className="text-slate-300" size={40} />
-                          </div>
-                          <h3 className="text-lg font-bold text-slate-800">
-                            No items found
-                          </h3>
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              <InventoryEmptyState />
             )}
           </div>
 
           <div className="xl:hidden">
             {currentTableData.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {currentTableData.map((item) => {
-                  const status = getStatus(item.stock);
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => router.push(`/inventory/info/${item.id}`)}
-                      className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all active:scale-[0.98] cursor-pointer"
-                    >
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-4">
-                          <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-slate-50 border border-slate-100 shrink-0">
-                            {item.image ? (
-                              <Image
-                                src={item.image}
-                                alt={item.name}
-                                fill
-                                className="object-cover"
-                              />
-                            ) : (
-                              <Package
-                                className="absolute inset-0 m-auto text-slate-300"
-                                size={20}
-                              />
-                            )}
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-slate-800 text-lg leading-tight">
-                              {item.name}
-                            </h3>
-                            <p className="text-slate-500 text-xs mt-1 font-medium">
-                              {item.category}
-                            </p>
-                          </div>
-                        </div>
-                        <span
-                          className={`px-2 py-1 text-[10px] font-black rounded-md border ${status.color}`}
-                        >
-                          {status.label.toUpperCase()}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-end pt-4 border-t border-slate-50">
-                        <div className="space-y-1">
-                          <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-                            Price
-                          </p>
-                          <p className="text-xl font-black text-slate-900">
-                            {currencySymbol}
-                            {item.price.toLocaleString()}
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={(e) => handleEdit(e, item)}
-                            className="p-3 bg-slate-50 text-blue-600 rounded-xl hover:bg-blue-50"
-                          >
-                            <Pencil size={18} />
-                          </button>
-                          <button
-                            onClick={(e) => handleDelete(e, item.id)}
-                            className="p-3 bg-slate-50 text-red-600 rounded-xl hover:bg-red-50"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {currentTableData.map((item) => (
+                  <InventoryCard
+                    key={item.id}
+                    item={item}
+                    router={router}
+                    calculateTotalStock={calculateTotalStock}
+                    getDisplayPrice={getDisplayPrice}
+                    getStatus={getStatus}
+                    handleEdit={handleEdit}
+                    handleDelete={handleDelete}
+                    currencySymbol={currencySymbol}
+                  />
+                ))}
               </div>
             ) : (
               <div className="text-center py-20 bg-slate-50/50 rounded-[40px] border-4 border-dashed border-slate-100">
-                <div className="bg-white w-16 h-16 rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-4">
-                  <Package className="text-slate-300" size={32} />
-                </div>
-                <h3 className="text-md font-bold text-slate-800">
-                  No stock found
-                </h3>
+                <InventoryEmptyState message="No stock found" />
               </div>
             )}
           </div>
@@ -318,10 +282,7 @@ export default function AllItemsPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         item={selectedItem}
-        onUpdate={() => {
-          fetchInventory();
-          setIsModalOpen(false);
-        }}
+        onUpdate={handleUpdateSuccess}
       />
     </div>
   );
