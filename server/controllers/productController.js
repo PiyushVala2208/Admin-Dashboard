@@ -5,11 +5,11 @@ const productController = {
     try {
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 12;
+
       const category = req.query.category || null;
       const minPrice = req.query.minPrice || null;
       const maxPrice = req.query.maxPrice || null;
       const sortBy = req.query.sortBy || "newest";
-
       const search = req.query.search || null;
 
       const offset = (page - 1) * limit;
