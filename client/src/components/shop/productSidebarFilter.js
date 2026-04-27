@@ -10,14 +10,14 @@ export default function ProductSidebarFilter({
   setPriceRange,
   categories,
 }) {
-  const handleCategoryChange = (cat) => {
-    const isSelected = selectedCategory.includes(cat);
+  const handleCategoryChange = (catSlug) => {
+    const isSelected = selectedCategory.includes(catSlug);
     let updatedCategories;
 
     if (isSelected) {
-      updatedCategories = selectedCategory.filter((item) => item !== cat);
+      updatedCategories = selectedCategory.filter((item) => item !== catSlug);
     } else {
-      updatedCategories = [...selectedCategory, cat];
+      updatedCategories = [...selectedCategory, catSlug];
     }
 
     setSelectedCategory(updatedCategories);
@@ -48,31 +48,34 @@ export default function ProductSidebarFilter({
               Categories
             </h3>
             <div className="space-y-3">
-              {categories.length > 0 ? (
-                categories.map((cat) => (
-                  <label
-                    key={cat}
-                    className="flex items-center gap-3 cursor-pointer group"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedCategory.some(
-                        (s) => s.toLowerCase() === cat.toLowerCase(),
-                      )}
-                      onChange={() => handleCategoryChange(cat)}
-                      className="w-4 h-4 accent-[#7C3AED] rounded border-gray-300 focus:ring-[#7C3AED]"
-                    />
-                    <span
-                      className={`text-[11px] font-medium transition-colors uppercase tracking-wider ${
-                        selectedCategory.includes(cat)
-                          ? "text-[#7C3AED] font-bold"
-                          : "text-[#4C1D95]/70"
-                      } group-hover:text-[#7C3AED]`}
+              {categories && categories.length > 0 ? (
+                categories.map((cat) => {
+                  const name = typeof cat === "object" ? cat.name : cat;
+                  const slug = typeof cat === "object" ? cat.slug : cat;
+
+                  return (
+                    <label
+                      key={slug} 
+                      className="flex items-center gap-3 cursor-pointer group"
                     >
-                      {cat}
-                    </span>
-                  </label>
-                ))
+                      <input
+                        type="checkbox"
+                        checked={selectedCategory.includes(slug)}
+                        onChange={() => handleCategoryChange(slug)}
+                        className="w-4 h-4 accent-[#7C3AED] rounded border-gray-300 focus:ring-[#7C3AED]"
+                      />
+                      <span
+                        className={`text-[11px] font-medium transition-colors uppercase tracking-wider ${
+                          selectedCategory.includes(slug)
+                            ? "text-[#7C3AED] font-bold"
+                            : "text-[#4C1D95]/70"
+                        } group-hover:text-[#7C3AED]`}
+                      >
+                        {name} 
+                      </span>
+                    </label>
+                  );
+                })
               ) : (
                 <p className="text-[10px] text-[#A78BFA] italic">
                   Loading categories...
