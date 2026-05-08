@@ -12,66 +12,83 @@ const OrderModel = {
     try {
       await client.query("BEGIN");
 
-      for (const item of cartItems) {
-        const productId = item.product || item.id;
-
-        const stockCheck = await client.query(
-          "SELECT stock, name FROM inventory WHERE id = $1 FOR UPDATE",
-          [productId],
-        );
-
-        if (stockCheck.rows.length === 0) {
-          throw new Error(`Product not found: ${item.name}`);
-        }
-
-        const currentStock = stockCheck.rows[0].stock;
-
-        if (currentStock < item.quantity) {
-          throw new Error(
-            `Insufficient stock for ${item.name}. Available: ${currentStock}, Requested: ${item.quantity}`,
-          );
-        }
-
-        await client.query(
-          "UPDATE inventory SET stock = stock - $1 WHERE id = $2",
-          [item.quantity, productId],
-        );
-      }
-
+      // 1. Order create
       const orderQuery = `
-        INSERT INTO orders (user_id, total_amount, payment_method)
-        VALUES ($1, $2, $3) RETURNING id
+        INSERT INTO orders (user_id, total_amount, payment_method, status)
+        VALUES ($1, $2, $3, 'PENDING') RETURNING id
       `;
-
       const orderRes = await client.query(orderQuery, [
         userId,
         parseFloat(totalAmount),
         paymentMethod,
       ]);
-
       const orderId = orderRes.rows[0].id;
 
-      const itemsQuery = `
-        INSERT INTO order_items (order_id, product_id, name, image, price, quantity)
-        VALUES ($1, $2, $3, $4, $5, $6)
-      `;
-
       for (const item of cartItems) {
+        const productId = item.id;
+        const variantId = item.variant_id;
+        let selectedVariantImage = null;
+
+        if (variantId) {
+          const variantCheck = await client.query(
+            "SELECT variant_stock, size, color, variant_image FROM product_variants WHERE id = $1 FOR UPDATE",
+            [variantId],
+          );
+
+          if (variantCheck.rows.length === 0) {
+            throw new Error(`Variant not found for product: ${item.name}`);
+          }
+
+          const currentVariantStock = variantCheck.rows[0].variant_stock;
+          selectedVariantImage = variantCheck.rows[0].variant_image || null;
+
+          if (currentVariantStock < item.quantity) {
+            throw new Error(
+              `Stock out for ${item.name} (${variantCheck.rows[0].size}). Available: ${currentVariantStock}`,
+            );
+          }
+
+          await client.query(
+            "UPDATE product_variants SET variant_stock = variant_stock - $1 WHERE id = $2",
+            [item.quantity, variantId],
+          );
+        } else {
+          const stockCheck = await client.query(
+            "SELECT stock FROM inventory WHERE id = $1 FOR UPDATE",
+            [productId],
+          );
+
+          if (stockCheck.rows[0].stock < item.quantity) {
+            throw new Error(`Insufficient stock for ${item.name}`);
+          }
+
+          await client.query(
+            "UPDATE inventory SET stock = stock - $1 WHERE id = $2",
+            [item.quantity, productId],
+          );
+        }
+
+        // 3. Order Items insert
+        const itemsQuery = `
+          INSERT INTO order_items (order_id, product_id, variant_id, name, image, price, quantity)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `;
         await client.query(itemsQuery, [
           orderId,
-          item.product || item.id,
+          productId,
+          variantId || null,
           item.name,
-          item.image,
+          selectedVariantImage || item.image,
           item.price,
           item.quantity,
         ]);
       }
 
+      // 4. Shipping Details insert
       const shippingQuery = `
         INSERT INTO shipping_details (order_id, full_name, address, city, pincode, phone)
         VALUES ($1, $2, $3, $4, $5, $6)
       `;
-
       await client.query(shippingQuery, [
         orderId,
         shippingAddress.fullName,
@@ -85,7 +102,7 @@ const OrderModel = {
       return orderId;
     } catch (error) {
       await client.query("ROLLBACK");
-      console.error("SQL Execution Error (placeOrder):", error.message);
+      console.error("Order Transaction Error:", error.message);
       throw error;
     } finally {
       client.release();
@@ -99,11 +116,27 @@ const OrderModel = {
           o.id, o.total_amount, o.payment_method, o.status, o.created_at,
           s.full_name, s.address, s.city, s.pincode, s.phone,
           COALESCE(
-            json_agg(DISTINCT oi.*) FILTER (WHERE oi.id IS NOT NULL), 
+            json_agg(
+              json_build_object(
+                'id', oi.id,
+                'order_id', oi.order_id,
+                'product_id', oi.product_id,
+                'variant_id', oi.variant_id,
+                'name', oi.name,
+                'image', COALESCE(oi.image, pv.variant_image, i.image),
+                'variant_image', pv.variant_image,
+                'color', pv.color,
+                'size', pv.size,
+                'price', oi.price,
+                'quantity', oi.quantity
+              )
+            ) FILTER (WHERE oi.id IS NOT NULL), 
             '[]'
           ) as items
         FROM orders o
         LEFT JOIN order_items oi ON o.id = oi.order_id
+        LEFT JOIN inventory i ON oi.product_id = i.id
+        LEFT JOIN product_variants pv ON oi.variant_id = pv.id
         LEFT JOIN shipping_details s ON o.id = s.order_id
         WHERE o.user_id = $1
         GROUP BY o.id, s.id
@@ -125,7 +158,6 @@ const OrderModel = {
           o.*, 
           u.name as customer_name,
           u.email as customer_email,
-          -- Yahan hum shipping details ko ek object mein pack kar rahe hain
           json_build_object(
             'name', s.full_name,
             'address', s.address,
@@ -134,12 +166,28 @@ const OrderModel = {
             'phone', s.phone
           ) as shipping_details,
           COALESCE(
-            json_agg(DISTINCT oi.*) FILTER (WHERE oi.id IS NOT NULL), 
+            json_agg(
+              json_build_object(
+                'id', oi.id,
+                'order_id', oi.order_id,
+                'product_id', oi.product_id,
+                'variant_id', oi.variant_id,
+                'name', oi.name,
+                'image', COALESCE(oi.image, pv.variant_image, i.image),
+                'variant_image', pv.variant_image,
+                'color', pv.color,
+                'size', pv.size,
+                'price', oi.price,
+                'quantity', oi.quantity
+              )
+            ) FILTER (WHERE oi.id IS NOT NULL), 
             '[]'
           ) as items
         FROM orders o
         LEFT JOIN users u ON o.user_id = u.id
         LEFT JOIN order_items oi ON o.id = oi.order_id
+        LEFT JOIN inventory i ON oi.product_id = i.id
+        LEFT JOIN product_variants pv ON oi.variant_id = pv.id
         LEFT JOIN shipping_details s ON o.id = s.order_id
         WHERE o.id = $1
         GROUP BY o.id, u.id, s.id
@@ -155,7 +203,6 @@ const OrderModel = {
   },
 
   //Admin Functions
-
   async getAllOrdersAdmin() {
     try {
       const query = `
@@ -164,17 +211,20 @@ const OrderModel = {
         u.name as customer_name, 
         u.email as customer_email,
         s.full_name, s.address, s.city, s.pincode, s.phone,
-        -- Industry Standard: Products ko JSON array mein aggregate karo
         COALESCE(
           (SELECT json_agg(json_build_object(
             'id', oi.id,
-            'name', i.name,
-            'image', i.image,
+            'name', COALESCE(oi.name, i.name),
+            'image', COALESCE(oi.image, pv.variant_image, i.image),
+            'variant_image', pv.variant_image,
+            'color', pv.color,
+            'size', pv.size,
             'price', oi.price,
             'quantity', oi.quantity
           ))
           FROM order_items oi
           JOIN inventory i ON oi.product_id = i.id
+          LEFT JOIN product_variants pv ON oi.variant_id = pv.id
           WHERE oi.order_id = o.id
         ), '[]') as items
       FROM orders o

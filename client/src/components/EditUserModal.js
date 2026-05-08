@@ -12,6 +12,7 @@ export default function EditUserModal({ isOpen, onClose, user, onUpdate }) {
   });
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (user) setFormData(user);
   }, [user]);
 

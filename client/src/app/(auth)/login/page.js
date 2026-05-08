@@ -1,11 +1,12 @@
 "use client";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import api from "@/app/utils/api";
 import Cookies from "js-cookie";
 import { useRouter, useSearchParams } from "next/navigation";
+import { loadCart, loadWishlist } from "@/app/utils/browserStorage";
 
-export default function LoginPage() {
+function LoginPageInner() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,8 +17,8 @@ export default function LoginPage() {
 
   const syncGuestData = async (userToken) => {
     try {
-      const guestCart = JSON.parse(localStorage.getItem("cart")) || [];
-      const guestWishlist = JSON.parse(localStorage.getItem("wishlist")) || [];
+      const guestCart = loadCart();
+      const guestWishlist = loadWishlist();
 
       if (guestCart.length > 0 || guestWishlist.length > 0) {
         await api.post(
@@ -134,5 +135,21 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-white px-5">
+          <div className="max-w-md w-full p-10 bg-slate-50 shadow-xl rounded-[2.5rem] border border-slate-200/50 text-center text-sm font-semibold text-slate-500">
+            Loading...
+          </div>
+        </div>
+      }
+    >
+      <LoginPageInner />
+    </Suspense>
   );
 }

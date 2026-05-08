@@ -1,5 +1,19 @@
 const pool = require("../db");
 
+let hasEnsuredVariantAttributesColumn = false;
+let hasEnsuredVariantImagesColumn = false;
+
+const tableExists = async (client, tableName) => {
+  const query = `
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = $1
+    LIMIT 1
+  `;
+  const result = await client.query(query, [tableName]);
+  return result.rowCount > 0;
+};
+
 const tableHasColumn = async (client, tableName, columnName) => {
   const query = `
     SELECT 1
@@ -12,44 +26,140 @@ const tableHasColumn = async (client, tableName, columnName) => {
   return result.rowCount > 0;
 };
 
+const ensureVariantAttributesColumn = async (client) => {
+  if (hasEnsuredVariantAttributesColumn) return;
+
+  const hasVariantAttributes = await tableHasColumn(
+    client,
+    "product_variants",
+    "variant_attributes",
+  );
+
+  if (!hasVariantAttributes) {
+    await client.query(
+      "ALTER TABLE product_variants ADD COLUMN variant_attributes jsonb NOT NULL DEFAULT '[]'::jsonb",
+    );
+  }
+
+  hasEnsuredVariantAttributesColumn = true;
+};
+
+const ensureVariantImagesColumn = async (client) => {
+  if (hasEnsuredVariantImagesColumn) return;
+
+  const hasVariantImages = await tableHasColumn(
+    client,
+    "product_variants",
+    "variant_images",
+  );
+
+  if (!hasVariantImages) {
+    await client.query(
+      "ALTER TABLE product_variants ADD COLUMN variant_images jsonb NOT NULL DEFAULT '[]'::jsonb",
+    );
+  }
+
+  hasEnsuredVariantImagesColumn = true;
+};
+
+const normalizeVariantAttributes = (variantAttributes = []) => {
+  if (!Array.isArray(variantAttributes)) {
+    return [];
+  }
+
+  const deduped = new Map();
+  variantAttributes.forEach((item) => {
+    if (!item || typeof item !== "object") return;
+
+    const attributeId = Number.parseInt(item.attributeId, 10);
+    const value = String(item.value || "").trim();
+
+    if (!Number.isInteger(attributeId) || attributeId <= 0) return;
+    deduped.set(attributeId, { attributeId, value });
+  });
+
+  return Array.from(deduped.values());
+};
+
 const mapVariantValues = (variant = {}) => {
+  const normalizedImages = Array.isArray(variant.variant_images)
+    ? variant.variant_images
+    : Array.isArray(variant.images)
+      ? variant.images
+      : [
+          variant.variant_image ||
+            variant.image ||
+            (Array.isArray(variant.images) ? variant.images[0] : null),
+        ];
+  const cleanedImages = [
+    ...new Set(
+      normalizedImages.map((item) => String(item || "").trim()).filter(Boolean),
+    ),
+  ];
+
   return {
     size: variant.size || variant.label || null,
     color: variant.color || null,
-    variant_price: Number.parseFloat(variant.variant_price) || 0,
-    variant_stock: Number.parseInt(variant.variant_stock, 10) || 0,
+    variant_price:
+      Number.parseFloat(variant.variant_price ?? variant.price) || 0,
+    variant_stock:
+      Number.parseInt(variant.variant_stock ?? variant.stock, 10) || 0,
     sku: variant.sku || `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    variant_image: variant.variant_image || null,
+    variant_image: cleanedImages[0] || null,
+    variant_images: cleanedImages,
     is_default: Boolean(variant.is_default),
+    variant_attributes: normalizeVariantAttributes(variant.variant_attributes),
   };
 };
 
 const getAllItems = async (userId, filterType = "all") => {
+  const hasAttributeValuesTable = await tableExists(pool, "product_attribute_values");
+
   let query = `
-    SELECT i.*, 
-    EXISTS (
-      SELECT 1 FROM product_variants pv2 
-      WHERE pv2.product_id = i.id AND pv2.variant_stock < 10
-    ) as has_critical,
-
-    (
-      SELECT COUNT(*) FROM product_variants pv3 
-      WHERE pv3.product_id = i.id AND pv3.variant_stock < 10
-    ) as critical_variants_count,
-
-    COALESCE(
-      json_agg(
-        pv.* ORDER BY pv.is_default DESC, pv.id ASC
-      ) FILTER (WHERE pv.id IS NOT NULL), '[]'
-    ) as variants
+    SELECT
+      i.*,
+      EXISTS (
+        SELECT 1
+        FROM product_variants pv2
+        WHERE pv2.product_id = i.id AND pv2.variant_stock < 10
+      ) AS has_critical,
+      (
+        SELECT COUNT(*)
+        FROM product_variants pv3
+        WHERE pv3.product_id = i.id AND pv3.variant_stock < 10
+      ) AS critical_variants_count,
+      COALESCE(
+        (
+          SELECT json_agg(pv.* ORDER BY pv.is_default DESC, pv.id ASC)
+          FROM product_variants pv
+          WHERE pv.product_id = i.id
+        ),
+        '[]'::json
+      ) AS variants,
+      ${
+        hasAttributeValuesTable
+          ? `COALESCE(
+              (
+                SELECT json_agg(
+                  json_build_object(
+                    'attributeId', pav.attribute_id,
+                    'value', pav.attribute_value
+                  )
+                  ORDER BY pav.attribute_id ASC
+                )
+                FROM product_attribute_values pav
+                WHERE pav.product_id = i.id
+              ),
+              '[]'::json
+            )`
+          : "'[]'::json"
+      } AS specifications
     FROM inventory i
-    LEFT JOIN product_variants pv ON i.id = pv.product_id
     WHERE i.user_id = $1
-    GROUP BY i.id
   `;
 
   if (filterType === "critical") {
-    query += ` HAVING EXISTS (
+    query += ` AND EXISTS (
       SELECT 1 FROM product_variants pv4 
       WHERE pv4.product_id = i.id AND pv4.variant_stock < 10
     )`;
@@ -61,21 +171,43 @@ const getAllItems = async (userId, filterType = "all") => {
 };
 
 const getItemById = async (id, userId) => {
+  const hasAttributeValuesTable = await tableExists(pool, "product_attribute_values");
+
   const query = `
-    SELECT i.*, 
+    SELECT i.*,
     EXISTS (
       SELECT 1 FROM product_variants pv2 
       WHERE pv2.product_id = i.id AND pv2.variant_stock < 10
     ) as has_critical,
     COALESCE(
-      json_agg(
-        pv.* ORDER BY pv.is_default DESC, pv.id ASC
-      ) FILTER (WHERE pv.id IS NOT NULL), '[]'
-    ) as variants
+      (
+        SELECT json_agg(pv.* ORDER BY pv.is_default DESC, pv.id ASC)
+        FROM product_variants pv
+        WHERE pv.product_id = i.id
+      ),
+      '[]'::json
+    ) as variants,
+    ${
+      hasAttributeValuesTable
+        ? `COALESCE(
+            (
+              SELECT json_agg(
+                json_build_object(
+                  'attributeId', pav.attribute_id,
+                  'value', pav.attribute_value
+                )
+                ORDER BY pav.attribute_id ASC
+              )
+              FROM product_attribute_values pav
+              WHERE pav.product_id = i.id
+            ),
+            '[]'::json
+          )`
+        : "'[]'::json"
+    } as specifications
     FROM inventory i
-    LEFT JOIN product_variants pv ON i.id = pv.product_id
     WHERE i.id = $1 AND i.user_id = $2
-    GROUP BY i.id`;
+    LIMIT 1`;
 
   return pool.query(query, [id, userId]);
 };
@@ -120,6 +252,9 @@ const createItem = async (client, productData) => {
 };
 
 const createVariant = async (client, productId, variant, isDefault = false) => {
+  await ensureVariantAttributesColumn(client);
+  await ensureVariantImagesColumn(client);
+
   const mappedVariant = mapVariantValues({
     ...variant,
     is_default: isDefault || variant.is_default,
@@ -127,9 +262,9 @@ const createVariant = async (client, productId, variant, isDefault = false) => {
 
   const query = `
     INSERT INTO product_variants (
-      product_id, size, color, variant_price, variant_stock, sku, variant_image, is_default
+      product_id, size, color, variant_price, variant_stock, sku, variant_image, variant_images, is_default, variant_attributes
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb)
     RETURNING *
   `;
 
@@ -141,7 +276,9 @@ const createVariant = async (client, productId, variant, isDefault = false) => {
     mappedVariant.variant_stock,
     mappedVariant.sku,
     mappedVariant.variant_image,
+    JSON.stringify(mappedVariant.variant_images),
     mappedVariant.is_default,
+    JSON.stringify(mappedVariant.variant_attributes),
   ]);
 };
 
@@ -185,6 +322,9 @@ const updateItem = async (client, id, productData) => {
 };
 
 const updateVariant = async (client, variantId, variant) => {
+  await ensureVariantAttributesColumn(client);
+  await ensureVariantImagesColumn(client);
+
   const mappedVariant = mapVariantValues(variant);
 
   const query = `
@@ -195,8 +335,10 @@ const updateVariant = async (client, variantId, variant) => {
         variant_stock = $4,
         sku = $5,
         variant_image = $6,
-        is_default = $7
-    WHERE id = $8
+        variant_images = $7::jsonb,
+        is_default = $8,
+        variant_attributes = $9::jsonb
+    WHERE id = $10
     RETURNING *
   `;
 
@@ -207,7 +349,9 @@ const updateVariant = async (client, variantId, variant) => {
     mappedVariant.variant_stock,
     mappedVariant.sku,
     mappedVariant.variant_image,
+    JSON.stringify(mappedVariant.variant_images),
     mappedVariant.is_default,
+    JSON.stringify(mappedVariant.variant_attributes),
     variantId,
   ]);
 };
@@ -241,6 +385,57 @@ const deleteVariantsByProductId = async (client, productId) => {
   ]);
 };
 
+const replaceProductAttributes = async (client, productId, attributes = []) => {
+  const hasAttributeValuesTable = await tableExists(
+    client,
+    "product_attribute_values",
+  );
+  if (!hasAttributeValuesTable) {
+    return;
+  }
+
+  await client.query(
+    "DELETE FROM product_attribute_values WHERE product_id = $1",
+    [productId],
+  );
+
+  if (!Array.isArray(attributes) || attributes.length === 0) {
+    return;
+  }
+
+  const normalizedAttributes = attributes
+    .map((item) => ({
+      attributeId: Number.parseInt(item.attributeId, 10),
+      value: String(item.value ?? "").trim(),
+    }))
+    .filter(
+      (item) => Number.isInteger(item.attributeId) && item.attributeId > 0 && item.value,
+    );
+
+  if (normalizedAttributes.length === 0) {
+    return;
+  }
+
+  const attributeIds = normalizedAttributes.map((item) => item.attributeId);
+  const values = normalizedAttributes.map((item) => item.value);
+
+  const insertQuery = `
+    INSERT INTO product_attribute_values (product_id, attribute_id, attribute_value)
+    SELECT $1, pair.attribute_id, pair.attribute_value
+    FROM (
+      SELECT
+        id_values.attribute_id,
+        value_values.attribute_value
+      FROM unnest($2::int[]) WITH ORDINALITY id_values(attribute_id, ord)
+      INNER JOIN unnest($3::text[]) WITH ORDINALITY value_values(attribute_value, ord)
+        ON id_values.ord = value_values.ord
+    ) AS pair
+    INNER JOIN attributes a ON a.id = pair.attribute_id
+  `;
+
+  await client.query(insertQuery, [productId, attributeIds, values]);
+};
+
 module.exports = {
   getAllItems,
   getItemById,
@@ -251,4 +446,5 @@ module.exports = {
   deleteItem,
   deleteVariant,
   deleteVariantsByProductId,
+  replaceProductAttributes,
 };

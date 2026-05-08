@@ -8,16 +8,11 @@ import {
   UploadCloud,
   ChevronRight,
 } from "lucide-react";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState } from "react";
 
 export default function VariantSection({ variants, setVariants }) {
   const fileInputRefs = useRef({});
   const lastCardRef = useRef(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -27,8 +22,6 @@ export default function VariantSection({ variants, setVariants }) {
       });
     }, 100);
   };
-
-  if (!mounted) return null;
 
   const uniqueColors = Array.from(
     new Set(variants.map((v) => v.color || "New Color")),

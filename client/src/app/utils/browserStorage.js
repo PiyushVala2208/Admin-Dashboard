@@ -3,7 +3,7 @@
 const CART_KEY = "cart";
 const WISHLIST_KEY = "wishlist";
 const STORAGE_SOURCES = ["local", "session", "memory"];
-const EMPTY_STORAGE_LIST = Object.freeze([]);
+export const EMPTY_STORAGE_LIST = Object.freeze([]);
 const memoryStorage = new Map();
 const storageSnapshotCache = new Map([
   [CART_KEY, { source: "memory", raw: null, items: EMPTY_STORAGE_LIST }],
@@ -181,6 +181,18 @@ const persistSnapshot = (
 export const getCartItemKey = (item) =>
   `${item?.id ?? "unknown"}-${item?.variant_id ?? "default"}`;
 
+export const getWishlistItemKey = (item) => {
+  const productId = item?.id ?? "unknown";
+  const variantId = item?.variant_id;
+  if (variantId != null) {
+    return `${productId}-${variantId}`;
+  }
+
+  const normalizedColor = cleanString(item?.selectedColor) || "no-color";
+  const normalizedSize = cleanString(item?.selectedSize) || "no-size";
+  return `${productId}-default-${normalizedColor}-${normalizedSize}`;
+};
+
 export const isQuotaExceededError = (error) =>
   error?.name === "QuotaExceededError" ||
   error?.code === 22 ||
@@ -311,16 +323,61 @@ const saveStoredList = (key, items, sanitizer) => {
   return persistSnapshot(key, finalItems, serializedItems);
 };
 
+const dedupeItemsByKey = (items, getKey) => {
+  if (!Array.isArray(items) || items.length <= 1) {
+    return Array.isArray(items) ? items : EMPTY_STORAGE_LIST;
+  }
+
+  const dedupedMap = new Map();
+  items.forEach((item) => {
+    dedupedMap.set(getKey(item), item);
+  });
+
+  // If no duplicates were removed, return the SAME original reference.
+  // This is critical for useSyncExternalStore — returning a new array
+  // reference on every call (even with identical content) causes React
+  // to see an infinite loop of "changed" snapshots.
+  if (dedupedMap.size === items.length) {
+    return items;
+  }
+
+  const dedupedItems = Array.from(dedupedMap.values());
+  return dedupedItems.length > 0 ? dedupedItems : EMPTY_STORAGE_LIST;
+};
+
 export const loadCart = () => parseStoredList(CART_KEY, sanitizeCartItem);
 
 export const saveCart = (items) =>
   saveStoredList(CART_KEY, items, sanitizeCartItem);
 
-export const loadWishlist = () =>
-  parseStoredList(WISHLIST_KEY, sanitizeWishlistItem);
+export const loadWishlist = () => {
+  const wishlistItems = parseStoredList(WISHLIST_KEY, sanitizeWishlistItem);
+  const dedupedItems = dedupeItemsByKey(wishlistItems, getWishlistItemKey);
 
-export const saveWishlist = (items) =>
-  saveStoredList(WISHLIST_KEY, items, sanitizeWishlistItem);
+  if (dedupedItems.length !== wishlistItems.length) {
+    persistSnapshot(
+      WISHLIST_KEY,
+      dedupedItems,
+      JSON.stringify(dedupedItems),
+      getCachedSnapshot(WISHLIST_KEY).source,
+    );
+  }
+
+  return dedupedItems;
+};
+
+export const saveWishlist = (items) => {
+  const sanitizedItems = (Array.isArray(items) ? items : [])
+    .map(sanitizeWishlistItem)
+    .filter(Boolean);
+  const finalItems = dedupeItemsByKey(sanitizedItems, getWishlistItemKey);
+
+  return persistSnapshot(
+    WISHLIST_KEY,
+    finalItems,
+    JSON.stringify(finalItems),
+  );
+};
 
 const clearStoredList = (key) => {
   STORAGE_SOURCES.forEach((source) => {

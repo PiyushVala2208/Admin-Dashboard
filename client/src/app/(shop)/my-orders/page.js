@@ -164,7 +164,7 @@ export default function MyOrdersPage() {
 
                     <div>
                       <h2 className="text-3xl font-bold text-[#4C1D95] tracking-tight">
-                        #LUX-{order.id || order._id?.slice(-6)}
+                        #OID-{order.id || order._id?.slice(-6)}
                       </h2>
                       <div className="flex items-center gap-2 text-[#4C1D95]/30 font-black text-[10px] uppercase tracking-widest mt-2">
                         <Clock size={12} />
@@ -194,9 +194,9 @@ export default function MyOrdersPage() {
                     {order.items?.slice(0, 5).map((item, idx) => (
                       <div key={idx} className="relative group/img">
                         <img
-                          src={item.image}
+                          src={item.variant_image || item.image}
                           alt=""
-                          className="h-20 w-20 rounded-2xl ring-8 ring-white object-cover border border-slate-100 transition-transform group-hover/img:-translate-y-2"
+                          className="h-20 w-20 rounded-2xl ring-8 ring-white object-cover border border-slate-100 transition-all duration-300 hover:scale-125 hover:z-10"
                         />
                       </div>
                     ))}

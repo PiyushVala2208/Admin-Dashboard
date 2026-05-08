@@ -1,241 +1,171 @@
 "use client";
-import React, { useState, useEffect } from "react";
-import {
-  Trash2,
-  Plus,
-  Minus,
-  ShoppingBag,
-  ArrowRight,
-  ShieldCheck,
-  Truck,
-  Loader2,
-  AlertCircle,
-} from "lucide-react";
-import Link from "next/link";
+
+import { useMemo, useState } from "react";
+import { ShoppingBag } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
+import { toast } from "react-hot-toast";
+import CartItemCard from "@/components/cart/CartItemCard";
+import OrderSummaryCard from "@/components/cart/OrderSummaryCard";
+import CheckoutBenefits from "@/components/cart/CheckoutBenefits";
+import EmptyCartState from "@/components/cart/EmptyCartState";
+import {
+  dispatchCartSync,
+  getCartItemKey,
+  loadCart,
+  saveCart,
+} from "@/app/utils/browserStorage";
 
 export default function CartPage() {
-  const [cartItems, setCartItems] = useState([]);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const [cartItems, setCartItems] = useState(() => loadCart());
 
-  useEffect(() => {
-    const savedCart = JSON.parse(localStorage.getItem("cart")) || [];
-    setCartItems(savedCart);
-    setLoading(false);
-  }, []);
+  const persistCart = (nextItems) => {
+    const result = saveCart(nextItems);
+    if (!result.ok) {
+      toast.error("Unable to update cart right now.");
+      return false;
+    }
 
-  const saveCart = (updatedCart) => {
-    setCartItems(updatedCart);
-    localStorage.setItem("cart", JSON.stringify(updatedCart));
-    window.dispatchEvent(new Event("storage"));
+    setCartItems(result.items);
+    dispatchCartSync();
+    return true;
   };
 
-  const updateQuantity = (id, delta) => {
-    const updatedCart = cartItems
+  const updateQuantity = (itemKey, delta) => {
+    const nextCart = cartItems
       .map((item) => {
-        if (item.id === id) {
-          const newQty = item.quantity + delta;
+        if (getCartItemKey(item) !== itemKey) return item;
 
-          if (newQty < 1) return null;
+        const currentQty = Number(item.quantity || 1);
+        const maxQty = Math.max(1, Number(item.stock || 1));
+        const nextQty = currentQty + delta;
 
-          if (newQty > item.stock) {
-            return item;
-          }
+        if (nextQty < 1) return null;
+        if (nextQty > maxQty) return item;
 
-          return { ...item, quantity: newQty };
-        }
-        return item;
+        return {
+          ...item,
+          quantity: nextQty,
+        };
       })
-      .filter((item) => item !== null);
+      .filter(Boolean);
 
-    saveCart(updatedCart);
+    persistCart(nextCart);
   };
 
-  const removeItem = (id) => {
-    const updatedCart = cartItems.filter((item) => item.id !== id);
-    saveCart(updatedCart);
+  const removeItem = (itemKey) => {
+    const nextCart = cartItems.filter((item) => getCartItemKey(item) !== itemKey);
+    persistCart(nextCart);
   };
 
-  const handleCheckout = (e) => {
-    e.preventDefault();
+  const handleSizeChange = (item, nextSize) => {
+    const variants = Array.isArray(item.variants) ? item.variants : [];
+    if (variants.length === 0) {
+      return;
+    }
+
+    const targetColor = String(item.selectedColor || "").trim().toLowerCase();
+    const matchedVariant =
+      variants.find(
+        (variant) =>
+          String(variant.size || "").trim() === nextSize &&
+          String(variant.color || "").trim().toLowerCase() === targetColor,
+      ) ||
+      variants.find((variant) => String(variant.size || "").trim() === nextSize);
+
+    if (!matchedVariant) {
+      toast.error("Selected size is not available.");
+      return;
+    }
+
+    const nextCart = cartItems.map((entry) => {
+      if (getCartItemKey(entry) !== getCartItemKey(item)) return entry;
+
+      const nextStock = Number(matchedVariant.variant_stock ?? matchedVariant.stock ?? 0);
+      const nextPrice = Number(matchedVariant.variant_price ?? matchedVariant.price ?? entry.price);
+      const nextImage =
+        matchedVariant.variant_image ||
+        (Array.isArray(matchedVariant.images) ? matchedVariant.images[0] : null) ||
+        entry.image;
+
+      return {
+        ...entry,
+        variant_id: matchedVariant.id || entry.variant_id,
+        selectedSize: nextSize,
+        price: nextPrice,
+        stock: nextStock,
+        image: nextImage,
+        quantity: Math.min(Number(entry.quantity || 1), Math.max(1, nextStock)),
+      };
+    });
+
+    persistCart(nextCart);
+  };
+
+  const handleCheckout = () => {
     const token = Cookies.get("token");
     if (!token) {
       router.push("/login?redirect=/checkout");
-    } else {
-      router.push("/checkout");
+      return;
     }
+
+    router.push("/checkout");
   };
 
-  const subtotal = cartItems.reduce(
-    (acc, item) => acc + Number(item.price) * item.quantity,
-    0,
+  const subtotal = useMemo(
+    () =>
+      cartItems.reduce(
+        (total, item) => total + Number(item.price || 0) * Number(item.quantity || 1),
+        0,
+      ),
+    [cartItems],
   );
-  const shipping = subtotal > 1000 || subtotal === 0 ? 0 : 99;
-  const total = subtotal + shipping;
 
-  if (loading)
-    return (
-      <div className="h-screen flex items-center justify-center bg-white">
-        <Loader2 className="animate-spin text-purple-600" size={40} />
-      </div>
-    );
+  const shipping = subtotal > 1000 || subtotal === 0 ? 0 : 99;
 
   return (
-    <div className="min-h-screen bg-[#FDFCFE] py-8 md:py-16 px-4 md:px-10">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-[#FDFCFE] px-4 py-8 md:px-10 md:py-16">
+      <div className="mx-auto max-w-7xl">
         <div className="mb-10 flex items-center gap-4">
-          <div className="p-3 bg-purple-600 rounded-2xl text-white shadow-lg shadow-purple-200">
+          <div className="rounded-2xl bg-purple-600 p-3 text-white shadow-lg shadow-purple-200">
             <ShoppingBag size={24} />
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+          <h1 className="text-3xl font-black tracking-tight text-slate-900 md:text-4xl">
             Your Bag
           </h1>
         </div>
 
         {cartItems.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-            <div className="lg:col-span-8 space-y-4">
-              {cartItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-white p-4 md:p-6 rounded-4xl border border-slate-200/60 shadow-sm flex flex-col sm:flex-row items-center gap-6 group transition-all hover:border-purple-200"
-                >
-                  <div className="w-full sm:w-32 h-32 rounded-2xl overflow-hidden bg-slate-50 shrink-0">
-                    <img
-                      src={item.image || item.image_url}
-                      alt={item.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    />
-                  </div>
-
-                  <div className="flex-1 text-center sm:text-left">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-purple-600 mb-1">
-                      {item.category}
-                    </p>
-                    <h3 className="font-bold text-slate-900 text-lg mb-1">
-                      {item.name}
-                    </h3>
-                    <p className="text-slate-400 text-sm font-medium italic">
-                      ₹{Number(item.price).toLocaleString()} each
-                    </p>
-
-                    {item.quantity >= item.stock && (
-                      <p className="text-[9px] text-orange-500 font-bold uppercase mt-2 flex items-center justify-center sm:justify-start gap-1">
-                        <AlertCircle size={10} /> Maximum stock reached
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center bg-slate-50 rounded-xl p-1 border border-slate-100">
-                    <button
-                      onClick={() => updateQuantity(item.id, -1)}
-                      disabled={item.quantity <= 1}
-                      className="p-2 hover:bg-white rounded-lg transition-colors text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      <Minus size={16} />
-                    </button>
-                    <span className="w-10 text-center font-bold text-slate-900 text-sm">
-                      {item.quantity}
-                    </span>
-                    <button
-                      onClick={() => updateQuantity(item.id, 1)}
-                      disabled={item.quantity >= item.stock}
-                      className={`p-2 rounded-lg transition-colors ${
-                        item.quantity >= item.stock
-                          ? "text-slate-300 cursor-not-allowed"
-                          : "hover:bg-white text-slate-600"
-                      }`}
-                    >
-                      <Plus size={16} />
-                    </button>
-                  </div>
-
-                  <div className="flex sm:flex-col items-center sm:items-end gap-4 sm:gap-1 w-full sm:w-auto border-t sm:border-t-0 pt-4 sm:pt-0">
-                    <p className="text-lg font-black text-slate-900 flex-1 sm:flex-none text-left sm:text-right">
-                      ₹{(item.price * item.quantity).toLocaleString()}
-                    </p>
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="text-slate-300 hover:text-red-500 transition-colors p-2"
-                    >
-                      <Trash2 size={20} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+          <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
+            <div className="space-y-4 lg:col-span-8">
+              {cartItems.map((item) => {
+                const itemKey = getCartItemKey(item);
+                return (
+                  <CartItemCard
+                    key={itemKey}
+                    item={item}
+                    itemKey={itemKey}
+                    variants={Array.isArray(item.variants) ? item.variants : []}
+                    onSizeChange={handleSizeChange}
+                    onQuantityChange={updateQuantity}
+                    onRemove={removeItem}
+                  />
+                );
+              })}
             </div>
 
-            <div className="lg:col-span-4">
-              <div className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-xl shadow-purple-100/20 sticky top-10">
-                <h2 className="text-xl font-black text-slate-900 mb-8 border-b pb-4">
-                  Order Summary
-                </h2>
-                <div className="space-y-4 mb-8">
-                  <div className="flex justify-between text-slate-500 font-medium">
-                    <span>Subtotal</span>
-                    <span className="text-slate-900">
-                      ₹{subtotal.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-slate-500 font-medium">
-                    <span>Shipping</span>
-                    <span
-                      className={
-                        shipping === 0
-                          ? "text-green-600 font-bold"
-                          : "text-slate-900"
-                      }
-                    >
-                      {shipping === 0 ? "FREE" : `₹${shipping}`}
-                    </span>
-                  </div>
-                  <div className="pt-4 border-t border-dashed flex justify-between items-end">
-                    <span className="text-sm font-bold uppercase tracking-widest text-slate-400">
-                      Total Amount
-                    </span>
-                    <span className="text-3xl font-black text-purple-600">
-                      ₹{total.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleCheckout}
-                  className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-purple-600 transition-all shadow-lg hover:shadow-purple-200 active:scale-[0.98] mb-6"
-                >
-                  Proceed To Checkout <ArrowRight size={18} />
-                </button>
-
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    <ShieldCheck size={16} className="text-green-500" /> Secure
-                    SSL Encryption
-                  </div>
-                  <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    <Truck size={16} className="text-blue-500" /> 7-Day Easy
-                    Returns
-                  </div>
-                </div>
-              </div>
+            <div className="space-y-5 lg:col-span-4">
+              <OrderSummaryCard
+                subtotal={subtotal}
+                shipping={shipping}
+                onCheckout={handleCheckout}
+              />
+              <CheckoutBenefits />
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-[3rem] p-16 md:p-24 border border-dashed border-slate-200 text-center shadow-sm max-w-2xl mx-auto">
-            <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-8 text-slate-200">
-              <ShoppingBag size={48} />
-            </div>
-            <h2 className="text-2xl font-black text-slate-900 mb-2">
-              Your cart feels lonely
-            </h2>
-            <Link
-              href="/products"
-              className="inline-flex bg-purple-600 text-white px-10 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-purple-700 transition-all mt-8"
-            >
-              Go To Shop
-            </Link>
-          </div>
+          <EmptyCartState />
         )}
       </div>
     </div>

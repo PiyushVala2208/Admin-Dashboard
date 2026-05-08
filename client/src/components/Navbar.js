@@ -11,6 +11,7 @@ import Link from "next/link";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const [userData, setUserData] = useState({
     name: "Guest",
     email: "guest@example.com",
@@ -24,13 +25,19 @@ export default function Navbar() {
   const DEFAULT_IMAGE = `${BACKEND_URL}/uploads/profiles/default.png`;
 
   useEffect(() => {
+    setIsMounted(true);
+
     const savedUser = localStorage.getItem("user");
-    if (savedUser) {
-      try {
-        setUserData(JSON.parse(savedUser));
-      } catch (error) {
-        console.error("Error parsing user data:", error);
+    if (!savedUser) return;
+
+    try {
+      const parsed = JSON.parse(savedUser);
+      if (parsed && typeof parsed === "object") {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setUserData(parsed);
       }
+    } catch (error) {
+      console.error("Error parsing user data:", error);
     }
   }, []);
 
@@ -76,10 +83,10 @@ export default function Navbar() {
       >
         <div className="hidden sm:flex flex-col items-right text-right border-l border-slate-200 pl-4 md:pl-6">
           <p className="text-sm font-bold text-slate-800 truncate max-w-37.5">
-            {userData.name}
+            {isMounted ? userData.name : "Guest"}
           </p>
           <p className="text-[10px] text-slate-500 font-medium truncate max-w-37.5">
-            {userData.email}
+            {isMounted ? userData.email : "guest@example.com"}
           </p>
         </div>
 
@@ -104,10 +111,10 @@ export default function Navbar() {
             <div className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] border border-slate-200 p-2 animate-in fade-in zoom-in duration-200 z-50 origin-top-right">
               <div className="sm:hidden px-4 py-3 border-b border-slate-100 mb-1">
                 <p className="text-sm font-bold text-slate-900">
-                  {userData.name}
+                  {isMounted ? userData.name : "Guest"}
                 </p>
                 <p className="text-xs text-slate-500 truncate">
-                  {userData.email}
+                  {isMounted ? userData.email : "guest@example.com"}
                 </p>
               </div>
 

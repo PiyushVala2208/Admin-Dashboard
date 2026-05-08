@@ -1,19 +1,20 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import axios from "axios";
 import {
   ChevronLeft,
   Package,
-  MapPin,
   CreditCard,
-  Receipt,
   Calendar,
   Hash,
   CheckCircle2,
   Truck,
   Box,
   Gift,
+  Palette, 
+  Maximize2, 
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -24,9 +25,11 @@ export default function OrderDetailsPage() {
   const [loading, setLoading] = useState(true);
 
   const statusSteps = ["Placed", "Processing", "Shipped", "Delivered"];
-  const currentStatusIndex = order ? statusSteps.findIndex(
-    (s) => s.toUpperCase() === order.status?.toUpperCase()
-  ) : 0;
+  const currentStatusIndex = order
+    ? statusSteps.findIndex(
+        (s) => s.toUpperCase() === order.status?.toUpperCase(),
+      )
+    : 0;
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -77,7 +80,7 @@ export default function OrderDetailsPage() {
           <div className="flex justify-between items-center relative">
             <div className="absolute h-0.5 w-full bg-[#F5F3FF] top-1/2 -translate-y-1/2 left-0 z-0" />
             <div
-              className="absolute h-0.5 bg-[#4C1D95] top-1/2 -translate-y-1/2 left-0 z-0 transition-all duration-1000 ease-in-out"
+              className="absolute h-0.5 bg-[#4C1D95] top-1/2 -translate-y-1/2 left-0 z-0 transition-all duration-1000"
               style={{
                 width: `${(currentStatusIndex / (statusSteps.length - 1)) * 100}%`,
               }}
@@ -95,27 +98,40 @@ export default function OrderDetailsPage() {
                   <div
                     className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all duration-700 ${
                       isCompleted
-                        ? "bg-[#4C1D95] border-[#4C1D95] text-white shadow-lg shadow-purple-200"
+                        ? "bg-[#4C1D95] border-[#4C1D95] text-white"
                         : "bg-white border-[#DDD6FE] text-[#DDD6FE]"
-                    } ${isCurrent ? "scale-110 ring-4 ring-purple-50" : ""}`}
+                    } ${isCurrent ? "scale-110 ring-4 ring-purple-50 shadow-lg shadow-purple-200" : ""}`}
                   >
-                    {step === "Placed" && <CheckCircle2 size={20} className={isCurrent ? "animate-pulse" : ""} />}
-                    {step === "Processing" && <Box size={20} className={isCurrent ? "animate-bounce" : ""} />}
-                    {step === "Shipped" && <Truck size={20} className={isCurrent ? "animate-pulse" : ""} />}
-                    {step === "Delivered" && <Gift size={20} className={isCurrent ? "animate-bounce" : ""} />}
+                    {step === "Placed" && (
+                      <CheckCircle2
+                        size={20}
+                        className={isCurrent ? "animate-pulse" : ""}
+                      />
+                    )}
+                    {step === "Processing" && (
+                      <Box
+                        size={20}
+                        className={isCurrent ? "animate-bounce" : ""}
+                      />
+                    )}
+                    {step === "Shipped" && (
+                      <Truck
+                        size={20}
+                        className={isCurrent ? "animate-pulse" : ""}
+                      />
+                    )}
+                    {step === "Delivered" && (
+                      <Gift
+                        size={20}
+                        className={isCurrent ? "animate-bounce" : ""}
+                      />
+                    )}
                   </div>
-
                   <span
-                    className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-500 ${
-                      isCompleted ? "text-[#4C1D95]" : "text-[#DDD6FE]"
-                    }`}
+                    className={`text-[9px] font-black uppercase tracking-widest ${isCompleted ? "text-[#4C1D95]" : "text-[#DDD6FE]"}`}
                   >
                     {step}
                   </span>
-
-                  {isCurrent && (
-                    <div className="absolute -bottom-2 w-1 h-1 bg-[#8B5CF6] rounded-full animate-ping" />
-                  )}
                 </div>
               );
             })}
@@ -149,24 +165,38 @@ export default function OrderDetailsPage() {
               </h2>
               <div className="space-y-8">
                 {order.items?.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-6 group">
-                    <div className="relative overflow-hidden rounded-3xl border border-[#DDD6FE]">
-                      <img
-                        src={item.image}
+                  <div key={idx} className="flex items-start gap-6 group">
+                    <div className="relative w-24 h-24 overflow-hidden rounded-3xl border border-[#DDD6FE] shrink-0">
+                      <Image
+                        src={item.variant_image || item.image}
                         alt={item.name}
-                        className="w-24 h-24 object-cover transition-transform duration-500 group-hover:scale-110"
+                        fill
+                        className="object-cover transition-transform duration-500 group-hover:scale-110"
                       />
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-[#4C1D95] text-lg">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-[#4C1D95] text-lg truncate">
                         {item.name}
                       </h3>
-                      <p className="text-xs text-[#4C1D95]/40 font-black uppercase tracking-widest mt-1">
-                        Quantity: {item.quantity}
-                      </p>
+
+                      <div className="flex flex-wrap gap-4 mt-2">
+                        {item.color && (
+                          <span className="flex items-center gap-1.5 text-[10px] font-black uppercase text-[#4C1D95]/50 bg-slate-50 px-2 py-0.5 rounded-md">
+                            <Palette size={10} /> {item.color}
+                          </span>
+                        )}
+                        {item.size && (
+                          <span className="flex items-center gap-1.5 text-[10px] font-black uppercase text-[#4C1D95]/50 bg-slate-50 px-2 py-0.5 rounded-md">
+                            <Maximize2 size={10} /> Size: {item.size}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1.5 text-[10px] font-black uppercase text-[#8B5CF6] bg-purple-50 px-2 py-0.5 rounded-md">
+                          Qty: {item.quantity}
+                        </span>
+                      </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-black text-[#8B5CF6] text-lg">
+                      <p className="font-black text-[#8B5CF6] text-lg tracking-tighter">
                         ₹
                         {(
                           parseFloat(item.price) * item.quantity
@@ -208,33 +238,35 @@ export default function OrderDetailsPage() {
           </div>
 
           <div className="space-y-8">
-            <div className="bg-[#4C1D95] text-white rounded-[3rem] p-10 shadow-2xl shadow-purple-200 relative overflow-hidden">
+            <div className="bg-[#4C1D95] text-white rounded-[3rem] p-10 shadow-2xl relative overflow-hidden">
               <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/5 rounded-full" />
-
               <h2 className="text-xs font-black uppercase tracking-[0.3em] mb-8 text-purple-300">
                 Destination
               </h2>
               <div className="space-y-4 relative z-10">
-                <div>
-                  <p className="text-2xl font-serif italic mb-2">
-                    {ship.name || order.full_name || "Guest User"}
-                  </p>
-                  <p className="text-sm text-purple-100/70 leading-relaxed font-medium">
-                    {ship.address || order.address}
-                    <br />
-                    {ship.city || order.city}{ship.pincode || order.pincode ? `, ${ship.pincode || order.pincode}` : ""}
-                  </p>
-                </div>
+                <p className="text-2xl font-serif italic">
+                  {ship.name || order.full_name || "Guest User"}
+                </p>
+                <p className="text-sm text-purple-100/70 leading-relaxed font-medium">
+                  {ship.address || order.address}
+                  <br />
+                  {ship.city || order.city}
+                  {ship.pincode || order.pincode
+                    ? `, ${ship.pincode || order.pincode}`
+                    : ""}
+                </p>
                 <div className="pt-6 border-t border-white/10">
                   <p className="text-[10px] font-black uppercase tracking-widest text-purple-300 mb-1">
                     Contact
                   </p>
-                  <p className="font-bold">{ship.phone || order.phone || "N/A"}</p>
+                  <p className="font-bold">
+                    {ship.phone || order.phone || "N/A"}
+                  </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white border border-[#DDD6FE] rounded-[2.5rem] p-8 text-center transition-all hover:border-[#8B5CF6]/30">
+            <div className="bg-white border border-[#DDD6FE] rounded-[2.5rem] p-8 text-center">
               <div className="w-12 h-12 bg-[#F5F3FF] rounded-2xl flex items-center justify-center mx-auto mb-4 text-[#8B5CF6]">
                 <CreditCard size={24} />
               </div>

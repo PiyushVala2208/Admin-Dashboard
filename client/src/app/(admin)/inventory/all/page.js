@@ -3,13 +3,14 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Package, Search, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import api from "@/app/utils/api";
-import EditInventoryModal from "@/components/EditInventoryModal";
-import SidebarFilter from "@/components/InvantorySidebarFilter";
+import EditInventoryModal from "@/components/edit-inventory/EditInventoryModal";
+import SidebarFilter from "@/components/inventory/InvantorySidebarFilter";
 import Pagination from "@/components/Pagination";
-import InventoryTable from "@/components/InventoryTable";
-import InventoryCard from "@/components/InventoryCard";
-import InventoryEmptyState from "@/components/InventoryEmptyState";
+import InventoryTable from "@/components/inventory/InventoryTable";
+import InventoryCard from "@/components/inventory/InventoryCard";
+import InventoryEmptyState from "@/components/inventory/InventoryEmptyState";
 import { useSettings } from "@/context/SettingsContext";
+import { toast } from "react-hot-toast";
 
 export default function AllItemsPage() {
   const router = useRouter();
@@ -96,6 +97,7 @@ export default function AllItemsPage() {
       setCategories(combinedCategories);
     } catch (error) {
       console.error("Error fetching data:", error);
+      toast.error("Failed to load inventory data.");
     } finally {
       setLoading(false);
     }
@@ -149,9 +151,10 @@ export default function AllItemsPage() {
     try {
       await api.delete(`/inventory/${id}`);
       setInventory((prev) => prev.filter((item) => item.id !== id));
+      toast.success("Product deleted successfully.");
     } catch (error) {
       console.error("Delete error:", error);
-      alert("Failed to delete item.");
+      toast.error(error?.message || "Failed to delete item.");
     }
   };
 

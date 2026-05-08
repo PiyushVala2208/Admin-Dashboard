@@ -88,7 +88,7 @@ export default function RolesPage() {
                   </span>
                 </td>
                 <td className="p-5 text-slate-500 leading-relaxed max-w-xs italic">
-                  "{role.description}"
+                  &quot;{role.description}&quot;
                 </td>
                 <td className="p-5">
                   <div className="flex flex-wrap gap-2">

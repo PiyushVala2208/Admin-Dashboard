@@ -113,7 +113,7 @@ export default function ShopHomePage() {
             The <span className="text-[#8B5CF6]">Signature</span> Edit
           </h2>
           <Link
-            href="/inventory"
+            href="/products"
             className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-[#A78BFA] border-b border-[#A78BFA] pb-1 hover:text-[#7C3AED] hover:border-[#7C3AED] transition-all"
           >
             Explore All Categories
@@ -159,8 +159,8 @@ export default function ShopHomePage() {
                 />
                 <div className="absolute inset-0 bg-linear-to-t from-[#4C1D95]/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-                <div className="absolute bottom-6 left-6 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500 hidden sm:block">
-                  <div className="bg-white/20 backdrop-blur-md border border-white/30 px-4 py-2 rounded-full">
+                <div className="absolute bottom-6 left-6 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all  hidden sm:block">
+                  <div className="bg-white/20 backdrop-blur-xs border border-white/30 px-4 py-2 rounded-full">
                     <span className="text-white text-[10px] font-bold tracking-widest uppercase">
                       View More
                     </span>

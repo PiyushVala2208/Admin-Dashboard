@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { 
   User, Mail, Phone, Lock, Bell, 
   ShieldCheck, Trash2, Save, 
@@ -8,25 +8,44 @@ import {
 } from "lucide-react";
 
 export default function SinglePageSettings() {
-  const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    address: "",
-    role: "Premium Member",
-    bio: ""
-  });
-
-  useEffect(() => {
-    const savedUser = localStorage.getItem("user");
-    if (savedUser) {
-      setFormData(JSON.parse(savedUser));
+  const [formData, setFormData] = useState(() => {
+    if (typeof window === "undefined") {
+      return {
+        name: "",
+        email: "",
+        phone: "",
+        address: "",
+        role: "Premium Member",
+        bio: "",
+      };
     }
-    setLoading(false);
-  }, []);
+
+    const savedUser = localStorage.getItem("user");
+    if (!savedUser) {
+      return {
+        name: "",
+        email: "",
+        phone: "",
+        address: "",
+        role: "Premium Member",
+        bio: "",
+      };
+    }
+
+    try {
+      return JSON.parse(savedUser);
+    } catch {
+      return {
+        name: "",
+        email: "",
+        phone: "",
+        address: "",
+        role: "Premium Member",
+        bio: "",
+      };
+    }
+  });
 
   const handleSave = () => {
     setIsSaving(true);
@@ -36,12 +55,6 @@ export default function SinglePageSettings() {
       alert("All settings updated successfully! ✨");
     }, 1200);
   };
-
-  if (loading) return (
-    <div className="h-screen w-full flex items-center justify-center bg-[#F5F3FF]">
-      <Loader2 className="animate-spin text-[#8B5CF6]" size={40} />
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-[#F8F7FF] py-8 md:py-16 px-4 sm:px-6 lg:px-8">

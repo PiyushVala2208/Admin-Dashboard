@@ -1,137 +1,204 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import { toast } from "react-hot-toast";
 import api from "@/app/utils/api";
-import {
-  ArrowLeft,
-  IndianRupee,
-  Layers,
-  History,
-  Loader2,
-  Package,
-  Trash2,
-} from "lucide-react";
-import EditInventoryModal from "@/components/EditInventoryModal";
+import EditInventoryModal from "@/components/edit-inventory/EditInventoryModal";
+import ProductSummaryCard from "@/components/info-inventory/ProductSummaryCard";
+import InventoryActivityCard from "@/components/info-inventory/InventoryActivityCard";
+import InventoryActionsCard from "@/components/info-inventory/InventoryActionsCard";
 
 export default function ItemInfoPage() {
   const router = useRouter();
   const params = useParams();
-  const id = params.id;
+  const id = params?.id;
 
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeletingVariant, setIsDeletingVariant] = useState(false);
 
   const [selectedColor, setSelectedColor] = useState("");
   const [selectedVariant, setSelectedVariant] = useState(null);
-  const [isDeletingVariant, setIsDeletingVariant] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    const fetchItem = async () => {
-      try {
-        const res = await api.get(`/inventory/${id}`);
-        setItem(res.data);
 
-        if (res.data.has_variants && res.data.variants?.length > 0) {
-          const defaultVar =
-            res.data.variants.find((v) => v.is_default) || res.data.variants[0];
-          setSelectedColor(defaultVar.color);
-          setSelectedVariant(defaultVar);
+    let active = true;
+
+    const fetchItem = async () => {
+      setLoading(true);
+      try {
+        const response = await api.get(`/inventory/${id}`);
+        const nextItem = response.data?.data || response.data;
+        if (!active) return;
+
+        setItem(nextItem || null);
+
+        if (
+          nextItem?.has_variants &&
+          Array.isArray(nextItem?.variants) &&
+          nextItem.variants.length > 0
+        ) {
+          const defaultVariant =
+            nextItem.variants.find((variant) => variant.is_default) ||
+            nextItem.variants[0];
+          setSelectedColor(defaultVariant?.color || "");
+          setSelectedVariant(defaultVariant || null);
+        } else {
+          setSelectedColor("");
+          setSelectedVariant(null);
         }
-      } catch (err) {
-        console.error("Error fetching data:", err);
+      } catch (error) {
+        if (!active) return;
+        toast.error(error?.message || "Unable to load inventory item.");
+        setItem(null);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
+
     fetchItem();
+
+    return () => {
+      active = false;
+    };
   }, [id]);
 
   const uniqueColors = useMemo(() => {
-    if (!item?.variants) return [];
-    return [...new Set(item.variants.map((v) => v.color))];
+    if (!Array.isArray(item?.variants)) return [];
+    return [
+      ...new Set(item.variants.map((variant) => variant.color).filter(Boolean)),
+    ];
   }, [item?.variants]);
 
   const availableSizes = useMemo(() => {
-    if (!item?.variants || !selectedColor) return [];
-    return item.variants.filter((v) => v.color === selectedColor);
+    if (!Array.isArray(item?.variants) || !selectedColor) return [];
+    return item.variants.filter((variant) => variant.color === selectedColor);
   }, [item?.variants, selectedColor]);
 
   const handleColorChange = (color) => {
     setSelectedColor(color);
-    const firstAvailable = item.variants.find((v) => v.color === color);
-    setSelectedVariant(firstAvailable);
+    const firstAvailable = item?.variants?.find(
+      (variant) => variant.color === color,
+    );
+    setSelectedVariant(firstAvailable || null);
   };
 
   const handleDeleteVariant = async () => {
-    if (!selectedVariant) return;
-    if (
-      !confirm(
-        `Delete variant: "${selectedVariant.color} - ${selectedVariant.size}"?`,
-      )
-    )
-      return;
+    if (!selectedVariant?.id) return;
+
+    const shouldDelete = window.confirm(
+      `Delete variant: \"${selectedVariant.color || "N/A"} - ${selectedVariant.size || "N/A"}\"?`,
+    );
+    if (!shouldDelete) return;
 
     setIsDeletingVariant(true);
     try {
       await api.delete(`/inventory/variant/${selectedVariant.id}`);
-      const updatedVariants = item.variants.filter(
-        (v) => v.id !== selectedVariant.id,
-      );
 
-      if (updatedVariants.length === 0) {
-        setItem({ ...item, variants: [], has_variants: false });
-        setSelectedVariant(null);
-      } else {
-        setItem({ ...item, variants: updatedVariants });
-        const nextVar =
-          updatedVariants.find((v) => v.color === selectedColor) ||
-          updatedVariants[0];
-        setSelectedColor(nextVar.color);
-        setSelectedVariant(nextVar);
-      }
-    } catch (err) {
-      alert("Failed to delete variant.");
+      setItem((current) => {
+        if (!current) return current;
+
+        const nextVariants = (current.variants || []).filter(
+          (variant) => variant.id !== selectedVariant.id,
+        );
+
+        if (nextVariants.length === 0) {
+          setSelectedColor("");
+          setSelectedVariant(null);
+          return { ...current, variants: [], has_variants: false };
+        }
+
+        const nextVariant =
+          nextVariants.find((variant) => variant.color === selectedColor) ||
+          nextVariants[0];
+
+        setSelectedColor(nextVariant?.color || "");
+        setSelectedVariant(nextVariant || null);
+
+        return {
+          ...current,
+          variants: nextVariants,
+          has_variants: nextVariants.length > 0,
+        };
+      });
+
+      toast.success("Variant deleted.");
+    } catch (error) {
+      toast.error(error?.message || "Failed to delete variant.");
     } finally {
       setIsDeletingVariant(false);
     }
   };
 
-  const handleUpdateSuccess = (updated) => {
-    const prevColor = selectedColor;
-    const prevSize = selectedVariant?.size;
-
-    setItem(updated);
-
-    if (updated.has_variants && updated.variants?.length > 0) {
-      const matchedVar = updated.variants.find(
-        (v) => v.color === prevColor && v.size === prevSize,
-      );
-
-      if (matchedVar) {
-        setSelectedColor(matchedVar.color);
-        setSelectedVariant(matchedVar);
-      } else {
-        const defaultVar =
-          updated.variants.find((v) => v.is_default) || updated.variants[0];
-        setSelectedColor(defaultVar.color);
-        setSelectedVariant(defaultVar);
-      }
+  const handleUpdateSuccess = (updatedItem) => {
+    if (!updatedItem) {
+      setIsEditModalOpen(false);
+      return;
     }
+
+    const previousColor = selectedColor;
+    const previousSize = selectedVariant?.size;
+
+    setItem(updatedItem);
+
+    if (
+      updatedItem?.has_variants &&
+      Array.isArray(updatedItem?.variants) &&
+      updatedItem.variants.length > 0
+    ) {
+      const matched = updatedItem.variants.find(
+        (variant) =>
+          variant.color === previousColor && variant.size === previousSize,
+      );
+      const fallback =
+        updatedItem.variants.find((variant) => variant.is_default) ||
+        updatedItem.variants[0];
+      const target = matched || fallback;
+      setSelectedColor(target?.color || "");
+      setSelectedVariant(target || null);
+    } else {
+      setSelectedColor("");
+      setSelectedVariant(null);
+    }
+
     setIsEditModalOpen(false);
+    toast.success("Product details updated.");
   };
 
-  if (loading)
+  const handleDeleteProduct = async () => {
+    if (!id) return;
+    const shouldDelete = window.confirm("Delete entire product?");
+    if (!shouldDelete) return;
+
+    try {
+      await api.delete(`/inventory/${id}`);
+      toast.success("Product deleted.");
+      router.push("/inventory/all");
+    } catch (error) {
+      toast.error(error?.message || "Failed to delete product.");
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="animate-spin w-12 h-12 text-blue-500" />
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
       </div>
     );
+  }
 
-  if (!item) return <div>Product not found</div>;
+  if (!item) {
+    return (
+      <div className="p-8 text-sm font-semibold text-slate-500">
+        Product not found.
+      </div>
+    );
+  }
 
   const defaultVariant =
     item.variants?.find((variant) => variant.is_default) ||
@@ -155,256 +222,54 @@ export default function ItemInfoPage() {
     0;
 
   const displaySKU = activeVariant?.sku || item.base_sku || item.sku || "N/A";
-
-  const displayImage = activeVariant?.variant_image || item.image;
-
+  const displayImage =
+    activeVariant?.variant_image || activeVariant?.images?.[0] || item.image;
   const displayDescription =
     item.description?.trim() || "No description available for this product.";
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto animate-in fade-in duration-500">
+    <div className="mx-auto max-w-6xl animate-in fade-in p-4 duration-500 sm:p-6 lg:p-8">
       <Link
         href="/inventory/all"
-        className="inline-flex items-center gap-2 text-slate-500 hover:text-blue-600 transition mb-6 group"
+        className="group mb-6 inline-flex items-center gap-2 text-slate-500 transition hover:text-blue-600"
       >
         <ArrowLeft
           size={20}
-          className="group-hover:-translate-x-1 transition-transform"
+          className="transition-transform group-hover:-translate-x-1"
         />
         <span className="font-medium">Back to Inventory</span>
       </Link>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white p-6 sm:p-10 shadow-xl border border-slate-100 rounded-[3rem] relative overflow-hidden">
-            <div className="flex flex-col md:flex-row gap-10">
-              <div className="w-full md:w-80 h-80 relative rounded-[2.5rem] overflow-hidden bg-slate-50 border border-slate-100 shadow-inner group">
-                {displayImage ? (
-                  <Image
-                    src={displayImage}
-                    alt={item.name}
-                    fill
-                    className="object-cover group-hover:scale-110 transition-transform duration-700"
-                    priority
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-slate-300">
-                    <Package size={80} strokeWidth={1} />
-                  </div>
-                )}
-              </div>
-
-              <div className="flex-1">
-                <span className="inline-block text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 py-1.5 px-4 rounded-full mb-4">
-                  {item.category}
-                </span>
-                <h1 className="text-4xl font-black text-slate-900 mb-2">
-                  {item.name}
-                </h1>
-                <p className="text-slate-400 text-[11px] font-mono font-bold tracking-widest mb-6">
-                  SKU: {displaySKU}
-                </p>
-
-                <div className="mb-6 max-w-2xl">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
-                    Description
-                  </p>
-                  <p className="text-sm leading-7 text-slate-600">
-                    {displayDescription}
-                  </p>
-                </div>
-
-                {item.has_variants && uniqueColors.length > 0 && (
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">
-                        Select Color
-                      </h3>
-                      <div className="flex flex-wrap gap-3">
-                        {uniqueColors.map((color) => {
-                          const hasLowStockInColor = item.variants.some(
-                            (v) => v.color === color && v.variant_stock <= 10,
-                          );
-                          return (
-                            <button
-                              key={color}
-                              onClick={() => handleColorChange(color)}
-                              className={`relative px-5 py-2 rounded-2xl text-xs font-bold transition-all border-2 ${
-                                selectedColor === color
-                                  ? "border-blue-600 bg-blue-50 text-blue-700 scale-105 shadow-md"
-                                  : hasLowStockInColor
-                                    ? "border-red-100 bg-white text-slate-500 hover:border-red-200"
-                                    : "border-slate-100 bg-white text-slate-500 hover:border-slate-300"
-                              }`}
-                            >
-                              {color}
-
-                              {hasLowStockInColor && (
-                                <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3">
-                        Available Sizes
-                      </h3>
-                      <div className="flex flex-wrap gap-3">
-                        {availableSizes.map((v) => {
-                          const isLow = v.variant_stock <= 10;
-                          return (
-                            <button
-                              key={v.id}
-                              onClick={() => setSelectedVariant(v)}
-                              className={`relative min-w-14 h-14 flex flex-col items-center justify-center rounded-xl text-sm font-bold transition-all border-2 ${
-                                selectedVariant?.id === v.id
-                                  ? "bg-slate-900 text-white border-slate-900 shadow-lg"
-                                  : isLow
-                                    ? "bg-red-50 text-red-600 border-red-200 hover:border-red-400"
-                                    : "bg-white text-slate-600 border-slate-100 hover:border-blue-400"
-                              }`}
-                            >
-                              <span>{v.size}</span>
-                              {isLow && (
-                                <span
-                                  className={`text-[8px] absolute -bottom-2 px-1 rounded bg-red-600 text-white leading-tight ${selectedVariant?.id === v.id ? "opacity-100" : "opacity-80"}`}
-                                >
-                                  LOW
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mt-12 pt-8 border-t border-slate-50">
-              <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 flex items-center gap-4">
-                <div className="p-3 bg-white rounded-2xl shadow-sm text-green-600">
-                  <IndianRupee size={24} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase">
-                    Price
-                  </p>
-                  <p className="text-2xl font-black text-slate-900">
-                    ₹{Number(displayPrice).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-              <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 flex items-center gap-4">
-                <div className="p-3 bg-white rounded-2xl shadow-sm text-purple-600">
-                  <Layers size={24} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase">
-                    Stock
-                  </p>
-                  <p className="text-2xl font-black text-slate-900">
-                    {displayStock} <span className="text-xs">Units</span>
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {selectedVariant && (
-              <div className="mt-8 p-4 bg-red-50/50 rounded-2xl border border-red-100 flex justify-between items-center">
-                <span className="text-[10px] font-bold text-red-600 uppercase">
-                  Manage Selected Variant
-                </span>
-                <button
-                  onClick={handleDeleteVariant}
-                  disabled={isDeletingVariant}
-                  className="p-2.5 bg-white text-red-500 rounded-xl hover:bg-red-500 hover:text-red-50 shadow-sm transition-all"
-                >
-                  {isDeletingVariant ? (
-                    <Loader2 size={18} className="animate-spin" />
-                  ) : (
-                    <Trash2 size={18} />
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <ProductSummaryCard
+            item={item}
+            displayImage={displayImage}
+            displaySKU={displaySKU}
+            displayDescription={displayDescription}
+            uniqueColors={uniqueColors}
+            selectedColor={selectedColor}
+            availableSizes={availableSizes}
+            selectedVariant={selectedVariant}
+            onColorChange={handleColorChange}
+            onSelectVariant={setSelectedVariant}
+            isDeletingVariant={isDeletingVariant}
+            onDeleteVariant={handleDeleteVariant}
+            displayPrice={displayPrice}
+            displayStock={displayStock}
+          />
         </div>
 
         <div className="space-y-6">
-          <div className="bg-slate-900 text-white p-8 rounded-[2.5rem] shadow-2xl overflow-hidden relative">
-            <div className="absolute top-[-20px] right-[-20px] w-32 h-32 bg-blue-500/20 rounded-full blur-3xl"></div>
-            <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400 mb-6">
-              <History size={16} className="text-blue-400" /> Activity & Summary
-            </h3>
+          <InventoryActivityCard
+            displayStock={Number(displayStock) || 0}
+            totalVariants={item.variants?.length || 0}
+          />
 
-            <div className="space-y-4">
-              <div className="flex justify-between py-3 border-b border-white/10">
-                <span className="text-[10px] text-slate-500 uppercase font-bold">
-                  Status
-                </span>
-                <span
-                  className={`text-[10px] font-black px-2 py-0.5 rounded ${
-                    displayStock > 10
-                      ? "bg-green-500/20 text-green-400"
-                      : displayStock > 0
-                        ? "bg-yellow-500/20 text-yellow-400"
-                        : "bg-red-500/20 text-red-400"
-                  }`}
-                >
-                  {displayStock > 10
-                    ? "IN STOCK"
-                    : displayStock > 0
-                      ? "LOW STOCK"
-                      : "OUT OF STOCK"}
-                </span>
-              </div>
-
-              <div className="flex justify-between py-3">
-                <span className="text-[10px] text-slate-500 uppercase font-bold">
-                  Total Variants
-                </span>
-                <span className="text-sm font-bold text-slate-200">
-                  {item.variants?.length || 0} items
-                </span>
-              </div>
-            </div>
-            {displayStock <= 10 && displayStock > 0 && (
-              <div className="p-3 bg-red-500/10 rounded-xl border border-red-500/20">
-                <p className="text-[10px] text-red-400 font-bold leading-tight">
-                  Warning: This variant needs a restock soon. Only{" "}
-                  {displayStock} units left.
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div className="p-6 bg-slate-50 rounded-[2.5rem] border border-slate-100 space-y-4 shadow-sm">
-            <button
-              onClick={() => setIsEditModalOpen(true)}
-              className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-slate-200"
-            >
-              Update Details
-            </button>
-            <button
-              onClick={() => {
-                if (confirm("Delete entire product?"))
-                  api
-                    .delete(`/inventory/${id}`)
-                    .then(() => router.push("/inventory/all"));
-              }}
-              className="w-full bg-white border border-red-100 text-red-500 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-50 transition-all"
-            >
-              Delete Product
-            </button>
-          </div>
+          <InventoryActionsCard
+            onEdit={() => setIsEditModalOpen(true)}
+            onDeleteProduct={handleDeleteProduct}
+          />
         </div>
       </div>
 

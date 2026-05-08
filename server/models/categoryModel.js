@@ -42,6 +42,13 @@ const Category = {
     return rows[0];
   },
 
+  findById: async (id, client) => {
+    const executor = resolveExecutor(client);
+    const query = `SELECT * FROM categories WHERE id = $1 LIMIT 1;`;
+    const { rows } = await executor.query(query, [id]);
+    return rows[0] || null;
+  },
+
   findByName: async (name, client) => {
     const executor = resolveExecutor(client);
     const normalizedName = normalizeCategoryName(name);

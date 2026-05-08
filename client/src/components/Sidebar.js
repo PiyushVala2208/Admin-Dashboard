@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import Link from "next/link";
 import {
   LogOut,
@@ -15,6 +15,7 @@ import {
   ShoppingCart,
   ArrowUpRight,
   ShoppingBag,
+  Layers3,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 
@@ -28,7 +29,11 @@ const menuItems = [
     name: "Users",
     icon: <Users size={20} />,
     submenu: [
-      { name: "All Users", path: "/users/all" },
+      {
+        name: "All Users",
+        path: "/users/all",
+        activePrefixes: ["/users/info"],
+      },
       { name: "Add User", path: "/users/add" },
       { name: "Roles", path: "/users/roles" },
     ],
@@ -37,9 +42,18 @@ const menuItems = [
     name: "Inventory",
     icon: <Package size={20} />,
     submenu: [
-      { name: "All Items", path: "/inventory/all" },
+      {
+        name: "All Items",
+        path: "/inventory/all",
+        activePrefixes: ["/inventory/info"],
+      },
       { name: "Add Item", path: "/inventory/add" },
     ],
+  },
+  {
+    name: "Catalog",
+    icon: <Layers3 size={20} />,
+    path: "/catalog/attributes",
   },
   {
     name: "Orders",
@@ -57,19 +71,22 @@ export default function Sidebar() {
   const [openMenus, setOpenMenus] = useState([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [userRole, setUserRole] = useState(null);
+  const [userRole] = useState(() => {
+    if (typeof window === "undefined") return null;
+
+    const userRaw = localStorage.getItem("user");
+    if (!userRaw) return null;
+
+    try {
+      const user = JSON.parse(userRaw);
+      return user.role?.toLowerCase() || "user";
+    } catch {
+      return "user";
+    }
+  });
 
   const sidebarRef = useRef(null);
   const pathname = usePathname();
-
-  useEffect(() => {
-    const userRaw = localStorage.getItem("user");
-    if (userRaw) {
-      const user = JSON.parse(userRaw);
-      setUserRole(user.role?.toLowerCase() || "user");
-    }
-    setIsMobileOpen(false);
-  }, [pathname]);
 
   const handleLogout = async () => {
     if (!confirm("Are you sure you want to logout?")) return;
@@ -78,9 +95,10 @@ export default function Sidebar() {
     window.location.replace("/");
   };
 
-  const isActive = (path) => {
+  const isActive = (path, extraPrefixes = []) => {
     if (path === "/") return pathname === "/";
-    return pathname === path || pathname.startsWith(path);
+    if (pathname === path || pathname.startsWith(path)) return true;
+    return extraPrefixes.some((prefix) => pathname.startsWith(prefix));
   };
 
   const toggleMenu = (menuName) => {
@@ -143,15 +161,16 @@ export default function Sidebar() {
         <nav className="flex-1 px-3 py-6 space-y-1.5 overflow-y-auto no-scrollbar">
           {menuItems.map((item) => {
             const hasSubActive = item.submenu?.some((sub) =>
-              isActive(sub.path),
+              isActive(sub.path, sub.activePrefixes),
             );
-            const isMenuOpen = openMenus.includes(item.name);
+            const isMenuOpen = openMenus.includes(item.name) || hasSubActive;
 
             return (
               <div key={item.name} className="relative">
                 {!item.submenu ? (
                   <Link
                     href={item.path}
+                    onClick={() => setIsMobileOpen(false)}
                     className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-300 group
                       ${
                         isActive(item.path)
@@ -202,9 +221,10 @@ export default function Sidebar() {
                           <Link
                             key={sub.name}
                             href={sub.path}
+                            onClick={() => setIsMobileOpen(false)}
                             className={`block py-2 px-4 rounded-lg text-sm transition-all relative
                               ${
-                                isActive(sub.path)
+                                isActive(sub.path, sub.activePrefixes)
                                   ? "text-blue-400 font-semibold before:content-[''] before:absolute before:left-[-1px] before:w-[2px] before:h-4 before:bg-blue-500 before:top-1/2 before:-translate-y-1/2"
                                   : "text-slate-500 hover:text-slate-200"
                               }`}
@@ -223,7 +243,11 @@ export default function Sidebar() {
           <div
             className={`pt-4 ${isCollapsed && !isMobileOpen ? "flex justify-center" : ""}`}
           >
-            <Link href="/" className="inline-block w-full">
+            <Link
+              href="/"
+              onClick={() => setIsMobileOpen(false)}
+              className="inline-block w-full"
+            >
               <button
                 className={`flex items-center bg-slate-800/50 text-white font-bold rounded-2xl shadow-lg hover:scale-[1.02] active:scale-95 transition-all duration-300 group overflow-hidden
                 ${isCollapsed && !isMobileOpen ? "p-3 justify-center w-12 h-12" : "px-5 py-3 w-full gap-3"}`}

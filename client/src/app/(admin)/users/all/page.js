@@ -44,6 +44,7 @@ export default function AllUserPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUsers();
   }, []);
 
@@ -189,7 +190,7 @@ export default function AllUserPage() {
                             No users found
                           </h3>
                           <p className="text-slate-400 text-sm max-w-xs mx-auto">
-                            We couldn't find anyone matching "{search}" or the
+                            We couldn&apos;t find anyone matching &quot;{search}&quot; or the
                             selected filters.
                           </p>
                         </div>

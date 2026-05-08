@@ -2,49 +2,47 @@
 import {
   createContext,
   useContext,
-  useState,
-  useEffect,
-  useCallback,
+  useSyncExternalStore,
 } from "react";
+import {
+  dispatchCartSync,
+  loadCart,
+  loadWishlist,
+  EMPTY_STORAGE_LIST,
+} from "@/app/utils/browserStorage";
 
 const CartContext = createContext();
 
+const subscribeToStorage = (callback) => {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  window.addEventListener("storage", callback);
+  window.addEventListener("cartUpdate", callback);
+
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener("cartUpdate", callback);
+  };
+};
+
 export const CartProvider = ({ children }) => {
-  const [cartCount, setCartCount] = useState(0);
-  const [wishlistCount, setWishlistCount] = useState(0);
-  const [cartItems, setCartItems] = useState([]);
-  const [wishlistItems, setWishlistItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cartItems = useSyncExternalStore(
+    subscribeToStorage,
+    loadCart,
+    () => EMPTY_STORAGE_LIST,
+  );
+  const wishlistItems = useSyncExternalStore(
+    subscribeToStorage,
+    loadWishlist,
+    () => EMPTY_STORAGE_LIST,
+  );
 
-  const refreshData = useCallback(async () => {
-    if (typeof window === "undefined") return;
-
-    const localCart = JSON.parse(localStorage.getItem("cart")) || [];
-    const localWish = JSON.parse(localStorage.getItem("wishlist")) || [];
-
-    setCartItems(localCart);
-    setWishlistItems(localWish);
-
-    setCartCount(localCart.length);
-
-    setWishlistCount(localWish.length);
-
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    refreshData();
-
-    const handleStorageChange = () => refreshData();
-    window.addEventListener("storage", handleStorageChange);
-
-    window.addEventListener("cartUpdate", handleStorageChange);
-
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("cartUpdate", handleStorageChange);
-    };
-  }, [refreshData]);
+  const cartCount = cartItems.length;
+  const wishlistCount = wishlistItems.length;
+  const refreshData = () => dispatchCartSync();
+  const loading = false;
 
   return (
     <CartContext.Provider

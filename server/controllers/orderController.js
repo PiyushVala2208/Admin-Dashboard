@@ -7,7 +7,18 @@ const createOrder = async (req, res) => {
     if (!cartItems || cartItems.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Your cart is empty.",
+        message: "Your cart is empty. Please add items before checking out.",
+      });
+    }
+
+    if (
+      !shippingAddress ||
+      !shippingAddress.address ||
+      !shippingAddress.phone
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Complete shipping address and phone number are required.",
       });
     }
 
@@ -15,13 +26,22 @@ const createOrder = async (req, res) => {
       userId: req.user.id,
       totalAmount: totalAmount,
       paymentMethod: paymentMethod || "COD",
-      cartItems: cartItems,
+      cartItems: cartItems.map((item) => ({
+        id: item.id,
+        variant_id: item.variant_id,
+        name: item.name,
+        image: item.image,
+        price: item.price,
+        quantity: item.quantity,
+        selectedSize: item.selectedSize,
+        selectedColor: item.selectedColor,
+      })),
       shippingAddress: {
-        fullName: shippingAddress?.fullName || "",
-        address: shippingAddress?.address,
-        city: shippingAddress?.city,
-        pincode: shippingAddress?.pincode,
-        phone: shippingAddress?.phone,
+        fullName: shippingAddress.fullName || req.user.name,
+        address: shippingAddress.address,
+        city: shippingAddress.city,
+        pincode: shippingAddress.pincode,
+        phone: shippingAddress.phone,
       },
     };
 
@@ -33,21 +53,24 @@ const createOrder = async (req, res) => {
       orderId,
     });
   } catch (error) {
-    console.error("Order Controller Error:", error.message);
+    console.error("Critical Order Controller Error:", error.message);
 
     if (
+      error.message.includes("Stock out") ||
       error.message.includes("Insufficient stock") ||
-      error.message.includes("not found")
+      error.message.includes("Variant not found")
     ) {
-      return res.status(400).json({
+      return res.status(409).json({
         success: false,
         message: error.message,
       });
     }
+
     res.status(500).json({
       success: false,
-      message: "An unexpected error occurred while placing your order",
-      error: error.message,
+      message:
+        "We encountered a technical issue while processing your order. Please try again.",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 };

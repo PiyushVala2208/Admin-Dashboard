@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Cookies from "js-cookie";
@@ -17,40 +17,90 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { clearCart, dispatchCartSync } from "@/app/utils/browserStorage";
+
+const GUEST_AUTH_SNAPSHOT = Object.freeze({
+  isLoggedIn: false,
+  isAdmin: false,
+});
+
+let cachedAuthSnapshot = {
+  token: null,
+  userData: null,
+  snapshot: GUEST_AUTH_SNAPSHOT,
+};
+
+const getClientAuthSnapshot = () => {
+  const token = Cookies.get("token") || null;
+  const userData = Cookies.get("user") || null;
+
+  if (
+    cachedAuthSnapshot.token === token &&
+    cachedAuthSnapshot.userData === userData
+  ) {
+    return cachedAuthSnapshot.snapshot;
+  }
+
+  let isAdmin = false;
+  if (token && userData) {
+    try {
+      const user = JSON.parse(userData);
+      isAdmin = (user.role ? user.role.toLowerCase() : "") === "admin";
+    } catch {
+      isAdmin = false;
+    }
+  }
+
+  const snapshot = token
+    ? Object.freeze({
+        isLoggedIn: true,
+        isAdmin,
+      })
+    : GUEST_AUTH_SNAPSHOT;
+
+  cachedAuthSnapshot = {
+    token,
+    userData,
+    snapshot,
+  };
+
+  return snapshot;
+};
+
+const subscribeToAuth = (callback) => {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  const notify = () => callback();
+
+  window.addEventListener("storage", notify);
+  window.addEventListener("cartUpdate", notify);
+  window.addEventListener("focus", notify);
+
+  return () => {
+    window.removeEventListener("storage", notify);
+    window.removeEventListener("cartUpdate", notify);
+    window.removeEventListener("focus", notify);
+  };
+};
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const dropdownRef = useRef(null);
   const pathname = usePathname();
   const router = useRouter();
 
   const { cartCount, wishlistCount, refreshData, cartItems } = useCart();
-
-  const checkAuth = () => {
-    const token = Cookies.get("token");
-    const userData = Cookies.get("user");
-
-    setIsLoggedIn(!!token);
-
-    if (token && userData) {
-      try {
-        const user = JSON.parse(userData);
-        const role = user.role ? user.role.toLowerCase() : "";
-        setIsAdmin(role === "admin");
-      } catch (err) {
-        setIsAdmin(false);
-      }
-    } else {
-      setIsAdmin(false);
-    }
-  };
+  const authSnapshot = useSyncExternalStore(
+    subscribeToAuth,
+    getClientAuthSnapshot,
+    () => GUEST_AUTH_SNAPSHOT,
+  );
+  const { isLoggedIn, isAdmin } = authSnapshot;
 
   useEffect(() => {
-    checkAuth();
-
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsProfileOpen(false);
@@ -58,27 +108,20 @@ export default function Navbar() {
     };
     document.addEventListener("mousedown", handleClickOutside);
 
-    window.addEventListener("storage", () => {
-      checkAuth();
-    });
-
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
-      window.removeEventListener("storage", () => checkAuth());
     };
   }, [pathname]);
 
   const handleLogout = () => {
     Cookies.remove("token");
     Cookies.remove("user");
-    localStorage.removeItem("cart");
-    setIsLoggedIn(false);
-    setIsAdmin(false);
+    clearCart();
     setIsProfileOpen(false);
 
     refreshData();
 
-    window.dispatchEvent(new Event("storage"));
+    dispatchCartSync();
     router.push("/");
   };
 

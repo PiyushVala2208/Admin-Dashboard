@@ -1,19 +1,21 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import axios from "axios";
 import Cookies from "js-cookie";
 import { toast } from "react-hot-toast";
 import {
   ArrowLeft,
   Package,
-  Truck,
   CheckCircle,
-  Clock,
   CreditCard,
   User,
   Mail,
   MapPin,
+  Palette, 
+  Maximize2, 
+  Phone, 
 } from "lucide-react";
 
 export default function OrderDetailsPage() {
@@ -36,10 +38,8 @@ export default function OrderDetailsPage() {
       const res = await axios.get(
         `http://localhost:8000/api/orders/admin/details/${id}`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          withCredentials: true, 
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
         },
       );
 
@@ -129,34 +129,55 @@ export default function OrderDetailsPage() {
                 <Package className="text-blue-500" /> Order Manifest
               </h2>
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                {order.items?.length || 0} Items Total
+                {order.items?.length || 0} Products Found
               </span>
             </div>
 
-            <div className="p-8 space-y-6">
+            <div className="p-8 space-y-8">
               {order.items?.map((item, index) => (
-                <div key={index} className="flex items-center gap-6 group">
+                <div key={index} className="flex items-start gap-6 group">
                   <div className="w-24 h-24 rounded-3xl bg-slate-50 border border-slate-100 overflow-hidden flex-shrink-0 relative group-hover:shadow-xl transition-all duration-500">
-                    <img
-                      src={item.image || "/api/placeholder/100/100"}
+                    <Image
+                      src={
+                        item.variant_image ||
+                        item.image ||
+                        "/api/placeholder/100/100"
+                      }
                       alt={item.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      fill
+                      className="object-cover group-hover:scale-110 transition-transform duration-500"
                     />
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-black text-slate-900 text-lg group-hover:text-blue-600 transition-colors uppercase tracking-tighter">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-black text-slate-900 text-lg group-hover:text-blue-600 transition-colors uppercase tracking-tighter truncate">
                       {item.name}
                     </h3>
-                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">
-                      Qty: {item.quantity}
-                    </p>
+
+                    <div className="flex flex-wrap gap-3 mt-2">
+                      {item.color && (
+                        <span className="flex items-center gap-1.5 text-[9px] font-black uppercase text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                          <Palette size={10} /> {item.color}
+                        </span>
+                      )}
+                      {item.size && (
+                        <span className="flex items-center gap-1.5 text-[9px] font-black uppercase text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                          <Maximize2 size={10} /> Size: {item.size}
+                        </span>
+                      )}
+                      <span className="text-[9px] font-black uppercase text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
+                        Qty: {item.quantity}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-black text-slate-900">
-                      ₹{parseFloat(item.price).toLocaleString()}
+                  <div className="text-right shrink-0">
+                    <p className="font-black text-slate-900 text-lg">
+                      ₹
+                      {(
+                        parseFloat(item.price) * item.quantity
+                      ).toLocaleString()}
                     </p>
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                      Subtotal
+                      ₹{parseFloat(item.price).toLocaleString()} / unit
                     </p>
                   </div>
                 </div>
@@ -167,7 +188,7 @@ export default function OrderDetailsPage() {
               <div className="flex justify-between items-end">
                 <div className="space-y-1">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    Financial Total
+                    Settlement Amount
                   </p>
                   <h2 className="text-4xl font-black text-slate-900 tracking-tighter">
                     ₹{parseFloat(order.total_amount).toLocaleString()}
@@ -188,7 +209,7 @@ export default function OrderDetailsPage() {
           <div className="bg-linear-to-r from-slate-800 to-black rounded-[2.5rem] p-8 text-white shadow-2xl shadow-slate-300 relative overflow-hidden">
             <div className="relative z-10">
               <h3 className="text-[10px] font-black text-slate-200 uppercase tracking-[0.2em] mb-6">
-                Logistics Status
+                Logistics Control
               </h3>
 
               <div className="space-y-3">
@@ -223,51 +244,58 @@ export default function OrderDetailsPage() {
 
           <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 p-8 space-y-6">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-              Customer Identity
+              Dispatch Identity
             </h3>
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
                   <User size={18} />
                 </div>
-                <div>
-                  <p className="text-xs font-black text-slate-900 uppercase">
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-slate-900 uppercase truncate">
                     {ship.name ||
                       order.customer_name ||
                       order.user?.name ||
-                      "Unknown Customer"}
+                      "Unknown"}
                   </p>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-                    System ID: {order.id || order._id || "N/A"}
+                    Order Ref: #{order.id}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
+                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+                  <Phone size={18} />
+                </div>
+                <p className="text-[10px] font-black text-slate-900 uppercase">
+                  {ship.phone || order.customer_phone || "No Contact"}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl shrink-0">
                   <Mail size={18} />
                 </div>
                 <p className="text-[10px] font-black text-slate-900 truncate uppercase">
                   {ship.email ||
                     order.customer_email ||
                     order.user?.email ||
-                    "No Email Found"}
+                    "No Email"}
                 </p>
               </div>
 
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-4 pt-2 border-t border-slate-50">
                 <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl shrink-0">
                   <MapPin size={18} />
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] font-black text-slate-900 leading-relaxed uppercase tracking-tight">
-                    {ship.address ||
-                      order.shipping_address ||
-                      "No address provided"}
+                    {ship.address || order.shipping_address || "N/A"}
                   </p>
                   {(ship.city || ship.pincode) && (
                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
-                      {ship.city} {ship.pincode && `- ${ship.pincode}`}
+                      {ship.city} {ship.pincode && `[${ship.pincode}]`}
                     </p>
                   )}
                 </div>

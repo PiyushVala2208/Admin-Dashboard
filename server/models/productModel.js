@@ -1,5 +1,57 @@
 const pool = require("../db");
 
+const tableExists = async (client, tableName) => {
+  const query = `
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = $1
+    LIMIT 1
+  `;
+  const result = await client.query(query, [tableName]);
+  return result.rowCount > 0;
+};
+
+const tableHasColumn = async (client, tableName, columnName) => {
+  const query = `
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = $1 AND column_name = $2
+    LIMIT 1
+  `;
+  const result = await client.query(query, [tableName, columnName]);
+  return result.rowCount > 0;
+};
+
+const normalizeVariant = (variant = {}, index = 0) => {
+  const normalizedImages = Array.isArray(variant.variant_images)
+    ? variant.variant_images
+    : [
+        String(
+          variant.variant_image ||
+            variant.image ||
+            (Array.isArray(variant.images) ? variant.images[0] : "") ||
+            "",
+        ).trim(),
+      ];
+  const images = [
+    ...new Set(normalizedImages.map((item) => String(item || "").trim()).filter(Boolean)),
+  ];
+
+  return {
+    ...variant,
+    is_default:
+      typeof variant.is_default === "boolean" ? variant.is_default : index === 0,
+    variant_attributes: Array.isArray(variant.variant_attributes)
+      ? variant.variant_attributes
+      : [],
+    variant_images: images,
+    images,
+    variant_image: images[0] || null,
+    price: Number(variant.variant_price ?? variant.price ?? 0),
+    stock: Number(variant.variant_stock ?? variant.stock ?? 0),
+  };
+};
+
 const Product = {
   getFilteredProducts: async ({
     category,
@@ -11,25 +63,43 @@ const Product = {
     search,
   }) => {
     let query = `
-      SELECT 
-        i.*, 
-        pv.id as variant_id,
-        pv.variant_image as variant_image,
-        pv.color as variant_color,
-        pv.size as variant_size,
-        pv.variant_price as price, 
-        pv.variant_stock as stock,
-        c.name as category_name,
-        c.slug as category_slug
+      SELECT
+        i.*,
+        c.name AS category_name,
+        c.slug AS category_slug,
+        vd.id AS variant_id,
+        vd.variant_image AS variant_image,
+        vd.color AS variant_color,
+        vd.size AS variant_size,
+        vd.variant_price AS default_variant_price,
+        vd.variant_stock AS default_variant_stock,
+        COALESCE(vs.starting_from_price, 0) AS starting_from_price,
+        COALESCE(vs.total_stock, 0) AS stock,
+        COALESCE(vs.variant_count, 0) AS variant_count,
+        COALESCE(vd.variant_image, i.image) AS image
       FROM inventory i
-      LEFT JOIN product_variants pv ON i.id = pv.product_id AND pv.is_default = true
+      LEFT JOIN LATERAL (
+        SELECT
+          MIN(pv.variant_price) AS starting_from_price,
+          SUM(GREATEST(pv.variant_stock, 0))::int AS total_stock,
+          COUNT(*)::int AS variant_count
+        FROM product_variants pv
+        WHERE pv.product_id = i.id
+      ) vs ON true
+      LEFT JOIN LATERAL (
+        SELECT pv.*
+        FROM product_variants pv
+        WHERE pv.product_id = i.id
+        ORDER BY pv.is_default DESC, pv.id ASC
+        LIMIT 1
+      ) vd ON true
       LEFT JOIN categories c ON i.category = c.slug OR i.category = c.name
-      WHERE 1=1`;
+      WHERE 1 = 1
+    `;
 
-    let values = [];
+    const values = [];
     let count = 1;
 
-    // 1. Category Filter 
     if (category) {
       const categoryArray = category.split(",");
       query += ` AND (c.slug = ANY($${count}) OR c.name = ANY($${count}))`;
@@ -37,48 +107,56 @@ const Product = {
       count++;
     }
 
-    // 2. Price Filters
     if (minPrice) {
-      query += ` AND pv.variant_price >= $${count}`;
-      values.push(minPrice);
-      count++;
-    }
-    if (maxPrice) {
-      query += ` AND pv.variant_price <= $${count}`;
-      values.push(maxPrice);
+      query += ` AND COALESCE(vs.starting_from_price, 0) >= $${count}`;
+      values.push(Number(minPrice));
       count++;
     }
 
-    // 3. Search logic
+    if (maxPrice) {
+      query += ` AND COALESCE(vs.starting_from_price, 0) <= $${count}`;
+      values.push(Number(maxPrice));
+      count++;
+    }
+
     if (search) {
       query += ` AND (i.name ILIKE $${count} OR i.description ILIKE $${count})`;
       values.push(`%${search}%`);
       count++;
     }
 
-    // 4. Sorting
-    if (sortBy === "price_low") query += ` ORDER BY pv.variant_price ASC`;
+    if (sortBy === "price_low") query += ` ORDER BY COALESCE(vs.starting_from_price, 0) ASC`;
     else if (sortBy === "price_high")
-      query += ` ORDER BY pv.variant_price DESC`;
+      query += ` ORDER BY COALESCE(vs.starting_from_price, 0) DESC`;
     else query += ` ORDER BY i.id DESC`;
 
-    // 5. Pagination
     query += ` LIMIT $${count} OFFSET $${count + 1}`;
     values.push(limit, offset);
 
     const result = await pool.query(query, values);
-    return result.rows;
+    return result.rows.map((row) => ({
+      ...row,
+      price: Number(row.starting_from_price || 0),
+      starting_from_price: Number(row.starting_from_price || 0),
+      stock: Number(row.stock || 0),
+      has_variants: Number(row.variant_count || 0) > 1 || Boolean(row.has_variants),
+    }));
   },
 
   getTotalCount: async ({ category, minPrice, maxPrice, search }) => {
     let query = `
-      SELECT COUNT(*) 
+      SELECT COUNT(*)
       FROM inventory i
-      LEFT JOIN product_variants pv ON i.id = pv.product_id AND pv.is_default = true
+      LEFT JOIN LATERAL (
+        SELECT MIN(pv.variant_price) AS starting_from_price
+        FROM product_variants pv
+        WHERE pv.product_id = i.id
+      ) vs ON true
       LEFT JOIN categories c ON i.category = c.slug OR i.category = c.name
-      WHERE 1=1`;
+      WHERE 1 = 1
+    `;
 
-    let values = [];
+    const values = [];
     let count = 1;
 
     if (category) {
@@ -88,13 +166,13 @@ const Product = {
       count++;
     }
     if (minPrice) {
-      query += ` AND pv.variant_price >= $${count}`;
-      values.push(minPrice);
+      query += ` AND COALESCE(vs.starting_from_price, 0) >= $${count}`;
+      values.push(Number(minPrice));
       count++;
     }
     if (maxPrice) {
-      query += ` AND pv.variant_price <= $${count}`;
-      values.push(maxPrice);
+      query += ` AND COALESCE(vs.starting_from_price, 0) <= $${count}`;
+      values.push(Number(maxPrice));
       count++;
     }
     if (search) {
@@ -104,34 +182,108 @@ const Product = {
     }
 
     const result = await pool.query(query, values);
-    return parseInt(result.rows[0].count);
+    return Number.parseInt(result.rows[0].count, 10);
   },
 
-  // Category Fetch updated to use the categories table
   getAllUniqueCategories: async () => {
     const query = `SELECT name, slug, attributes FROM categories ORDER BY name ASC`;
     const result = await pool.query(query);
-    return result.rows; 
+    return result.rows;
   },
 
   getProductById: async (id) => {
     try {
+      const hasAttributeValuesTable = await tableExists(
+        pool,
+        "product_attribute_values",
+      );
+      const hasAttributeRequiredColumn = await tableHasColumn(
+        pool,
+        "attributes",
+        "is_required",
+      );
+      const hasCategoryAttributesTable = await tableExists(
+        pool,
+        "category_attributes",
+      );
+
       const productQuery = `
-        SELECT i.*, c.name as category_name, c.attributes as category_attributes
+        SELECT i.*, c.id AS category_id, c.name AS category_name, c.slug AS category_slug
         FROM inventory i
         LEFT JOIN categories c ON i.category = c.slug OR i.category = c.name
-        WHERE i.id = $1`;
+        WHERE i.id = $1
+        LIMIT 1
+      `;
 
-      const variantsQuery = `SELECT * FROM product_variants WHERE product_id = $1 ORDER BY is_default DESC`;
+      const variantsQuery = `SELECT * FROM product_variants WHERE product_id = $1 ORDER BY is_default DESC, id ASC`;
 
       const productRes = await pool.query(productQuery, [id]);
-      const variantsRes = await pool.query(variantsQuery, [id]);
-
       if (productRes.rows.length === 0) return null;
+      const baseProduct = productRes.rows[0];
+
+      const [variantsRes, specsRes, definitionsRes] = await Promise.all([
+        pool.query(variantsQuery, [id]),
+        hasAttributeValuesTable
+          ? pool.query(
+              `
+                SELECT
+                  pav.attribute_id AS "attributeId",
+                  pav.attribute_value AS value,
+                  a.name AS attribute_name,
+                  a.type AS attribute_type
+                FROM product_attribute_values pav
+                LEFT JOIN attributes a ON a.id = pav.attribute_id
+                WHERE pav.product_id = $1
+                ORDER BY pav.attribute_id ASC
+              `,
+              [id],
+            )
+          : Promise.resolve({ rows: [] }),
+        baseProduct.category_id && hasCategoryAttributesTable
+          ? pool.query(
+              `
+                SELECT
+                  a.id,
+                  a.name,
+                  a.type,
+                  ${
+                    hasAttributeRequiredColumn
+                      ? "(a.is_required OR ca.is_required)"
+                      : "ca.is_required"
+                  } AS is_required,
+                  ca.sort_order,
+                  COALESCE(
+                    array_agg(ao.option_value ORDER BY ao.id) FILTER (WHERE ao.id IS NOT NULL),
+                    '{}'
+                  ) AS options
+                FROM category_attributes ca
+                INNER JOIN attributes a ON a.id = ca.attribute_id
+                LEFT JOIN attribute_options ao ON ao.attribute_id = a.id
+                WHERE ca.category_id = $1
+                GROUP BY a.id, ca.is_required, ca.sort_order
+                ORDER BY ca.sort_order ASC, a.name ASC
+              `,
+              [baseProduct.category_id],
+            )
+          : Promise.resolve({ rows: [] }),
+      ]);
+
+      const variants = variantsRes.rows.map((variant, index) =>
+        normalizeVariant(variant, index),
+      );
+
+      const specifications = specsRes.rows.map((row) => ({
+        attributeId: Number(row.attributeId),
+        value: String(row.value || ""),
+        attribute_name: row.attribute_name || null,
+        attribute_type: row.attribute_type || null,
+      }));
 
       return {
-        ...productRes.rows[0],
-        variants: variantsRes.rows,
+        ...baseProduct,
+        variants,
+        specifications,
+        attribute_definitions: definitionsRes.rows,
       };
     } catch (error) {
       console.error("Database Error in getProductById:", error);

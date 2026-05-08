@@ -8,9 +8,16 @@ import { toast } from "react-hot-toast";
 import Cookies from "js-cookie";
 import AddressSection from "@/components/shop/AddressSection";
 import AddressForm from "@/components/shop/AddressForm";
+import {
+  clearCart,
+  dispatchCartSync,
+  getCartItemKey,
+  loadCart,
+} from "@/app/utils/browserStorage";
 
 export default function CheckoutPage() {
   const router = useRouter();
+
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -21,7 +28,7 @@ export default function CheckoutPage() {
   const [editingAddress, setEditingAddress] = useState(null);
 
   useEffect(() => {
-    const savedCart = JSON.parse(localStorage.getItem("cart")) || [];
+    const savedCart = loadCart();
     if (savedCart.length === 0) {
       router.push("/cart");
       return;
@@ -126,13 +133,17 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       const token = Cookies.get("token");
+
       const orderData = {
         cartItems: cartItems.map((item) => ({
           id: item.id || item._id,
+          variant_id: item.variant_id || null,
           name: item.name,
           price: item.price,
           quantity: item.quantity,
           image: item.image || item.image_url,
+          selectedSize: item.selectedSize || null,
+          selectedColor: item.selectedColor || null,
         })),
         shippingAddress: {
           fullName: selectedAddress.full_name,
@@ -158,8 +169,8 @@ export default function CheckoutPage() {
 
       if (response.data.success) {
         toast.success("Order Placed! 🥂");
-        localStorage.removeItem("cart");
-        window.dispatchEvent(new Event("storage"));
+        clearCart();
+        dispatchCartSync();
         router.replace("/my-orders");
       }
     } catch (error) {
@@ -266,9 +277,12 @@ export default function CheckoutPage() {
               <h3 className="text-lg font-black text-slate-900 mb-6">
                 Order Summary
               </h3>
-              <div className="max-h-[300px] overflow-y-auto mb-8 pr-2 space-y-4 custom-scrollbar">
+              <div className="max-h-75 overflow-y-auto mb-8 pr-2 space-y-4 custom-scrollbar">
                 {cartItems.map((item) => (
-                  <div key={item.id} className="flex items-center gap-4">
+                  <div
+                    key={getCartItemKey(item)}
+                    className="flex items-center gap-4"
+                  >
                     <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-50 shrink-0 border border-slate-100">
                       <img
                         src={item.image || item.image_url}
@@ -280,9 +294,25 @@ export default function CheckoutPage() {
                       <p className="text-sm font-bold text-slate-900 line-clamp-1">
                         {item.name}
                       </p>
-                      <p className="text-xs text-slate-400 font-medium">
-                        Qty: {item.quantity}
-                      </p>
+
+                      <div className="flex gap-2 mt-2">
+                        {item.selectedColor && (
+                          <span className="text-[8px] bg-slate-100 px-1.5 py-0.5 rounded font-bold uppercase text-slate-500">
+                            Color: {item.selectedColor}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2 mt-0.5">
+                        {item.selectedSize && (
+                          <span className="text-[8px] bg-slate-100 px-1.5 py-0.5 rounded font-bold uppercase text-slate-500">
+                            Size: {item.selectedSize}
+                          </span>
+                        )}
+                        <span className="text-[8px] text-slate-500 font-medium ">
+                          Qty: {item.quantity}
+                        </span>
+                      </div>
                     </div>
                     <p className="text-sm font-bold text-slate-900">
                       ₹{(item.price * item.quantity).toLocaleString()}

@@ -109,7 +109,7 @@ export default function SettingPage() {
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
         <h2 className="text-xl font-bold text-slate-800">Access Denied</h2>
         <p className="text-slate-500">
-          You don't have permission to view this page.
+          You don&apos;t have permission to view this page.
         </p>
       </div>
     );

@@ -18,6 +18,7 @@ export default function AddressForm({ onSubmit, onClose, initialData }) {
 
   useEffect(() => {
     if (initialData) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({
         full_name: initialData.full_name || "",
         phone: initialData.phone || "",
