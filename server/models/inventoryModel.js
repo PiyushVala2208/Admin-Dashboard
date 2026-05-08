@@ -2,6 +2,7 @@ const pool = require("../db");
 
 let hasEnsuredVariantAttributesColumn = false;
 let hasEnsuredVariantImagesColumn = false;
+let hasEnsuredInventorySoftDeleteColumns = false;
 
 const tableExists = async (client, tableName) => {
   const query = `
@@ -62,6 +63,26 @@ const ensureVariantImagesColumn = async (client) => {
   hasEnsuredVariantImagesColumn = true;
 };
 
+const ensureInventorySoftDeleteColumns = async (client) => {
+  if (hasEnsuredInventorySoftDeleteColumns) return;
+
+  const hasIsActive = await tableHasColumn(client, "inventory", "is_active");
+  if (!hasIsActive) {
+    await client.query(
+      "ALTER TABLE inventory ADD COLUMN is_active boolean NOT NULL DEFAULT true",
+    );
+  }
+
+  const hasDeletedAt = await tableHasColumn(client, "inventory", "deleted_at");
+  if (!hasDeletedAt) {
+    await client.query(
+      "ALTER TABLE inventory ADD COLUMN deleted_at timestamptz NULL",
+    );
+  }
+
+  hasEnsuredInventorySoftDeleteColumns = true;
+};
+
 const normalizeVariantAttributes = (variantAttributes = []) => {
   if (!Array.isArray(variantAttributes)) {
     return [];
@@ -113,7 +134,11 @@ const mapVariantValues = (variant = {}) => {
 };
 
 const getAllItems = async (userId, filterType = "all") => {
-  const hasAttributeValuesTable = await tableExists(pool, "product_attribute_values");
+  await ensureInventorySoftDeleteColumns(pool);
+  const hasAttributeValuesTable = await tableExists(
+    pool,
+    "product_attribute_values",
+  );
 
   let query = `
     SELECT
@@ -155,7 +180,7 @@ const getAllItems = async (userId, filterType = "all") => {
           : "'[]'::json"
       } AS specifications
     FROM inventory i
-    WHERE i.user_id = $1
+    WHERE i.user_id = $1 AND i.is_active = true
   `;
 
   if (filterType === "critical") {
@@ -171,7 +196,11 @@ const getAllItems = async (userId, filterType = "all") => {
 };
 
 const getItemById = async (id, userId) => {
-  const hasAttributeValuesTable = await tableExists(pool, "product_attribute_values");
+  await ensureInventorySoftDeleteColumns(pool);
+  const hasAttributeValuesTable = await tableExists(
+    pool,
+    "product_attribute_values",
+  );
 
   const query = `
     SELECT i.*,
@@ -206,7 +235,7 @@ const getItemById = async (id, userId) => {
         : "'[]'::json"
     } as specifications
     FROM inventory i
-    WHERE i.id = $1 AND i.user_id = $2
+    WHERE i.id = $1 AND i.user_id = $2 AND i.is_active = true
     LIMIT 1`;
 
   return pool.query(query, [id, userId]);
@@ -357,10 +386,70 @@ const updateVariant = async (client, variantId, variant) => {
 };
 
 const deleteItem = async (id, userId) => {
-  return pool.query("DELETE FROM inventory WHERE id = $1 AND user_id = $2", [
-    id,
-    userId,
-  ]);
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    await ensureInventorySoftDeleteColumns(client);
+
+    const itemResult = await client.query(
+      "SELECT id FROM inventory WHERE id = $1 AND user_id = $2 FOR UPDATE",
+      [id, userId],
+    );
+
+    if (itemResult.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return { rowCount: 0 };
+    }
+
+    const hasOrderItemsTable = await tableExists(client, "order_items");
+    if (hasOrderItemsTable) {
+      const orderCheck = await client.query(
+        "SELECT 1 FROM order_items WHERE product_id = $1 LIMIT 1",
+        [id],
+      );
+
+      if (orderCheck.rowCount > 0) {
+        const softDeleteResult = await client.query(
+          "UPDATE inventory SET is_active = false, deleted_at = NOW() WHERE id = $1 AND user_id = $2 AND is_active = true",
+          [id, userId],
+        );
+        await client.query("COMMIT");
+        return softDeleteResult;
+      }
+    }
+
+    const hasVariantsTable = await tableExists(client, "product_variants");
+    if (hasVariantsTable) {
+      await client.query("DELETE FROM product_variants WHERE product_id = $1", [
+        id,
+      ]);
+    }
+
+    const hasAttributeValuesTable = await tableExists(
+      client,
+      "product_attribute_values",
+    );
+    if (hasAttributeValuesTable) {
+      await client.query(
+        "DELETE FROM product_attribute_values WHERE product_id = $1",
+        [id],
+      );
+    }
+
+    const result = await client.query(
+      "DELETE FROM inventory WHERE id = $1 AND user_id = $2",
+      [id, userId],
+    );
+
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 const deleteVariant = async (variantId, userId) => {
@@ -409,7 +498,10 @@ const replaceProductAttributes = async (client, productId, attributes = []) => {
       value: String(item.value ?? "").trim(),
     }))
     .filter(
-      (item) => Number.isInteger(item.attributeId) && item.attributeId > 0 && item.value,
+      (item) =>
+        Number.isInteger(item.attributeId) &&
+        item.attributeId > 0 &&
+        item.value,
     );
 
   if (normalizedAttributes.length === 0) {

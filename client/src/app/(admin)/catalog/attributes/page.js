@@ -26,27 +26,34 @@ export default function AttributesPage() {
 
     setAttributes((current) =>
       current.map((item) =>
-        Number(item.id) === Number(updatedAttribute.id) ? updatedAttribute : item,
+        Number(item.id) === Number(updatedAttribute.id)
+          ? updatedAttribute
+          : item,
       ),
     );
   }, []);
 
-  const handleAttributeCreated = useCallback((createdAttribute) => {
-    if (!createdAttribute?.id) {
-      fetchAttributes();
-      return;
-    }
+  const handleAttributeCreated = useCallback(
+    (createdAttribute) => {
+      if (!createdAttribute?.id) {
+        fetchAttributes();
+        return;
+      }
 
-    setAttributes((current) => {
-      const withoutDuplicate = current.filter(
-        (item) => Number(item.id) !== Number(createdAttribute.id),
-      );
-      const next = [createdAttribute, ...withoutDuplicate];
-      next.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
-      return next;
-    });
-    fetchAttributes();
-  }, [fetchAttributes]);
+      setAttributes((current) => {
+        const withoutDuplicate = current.filter(
+          (item) => Number(item.id) !== Number(createdAttribute.id),
+        );
+        const next = [createdAttribute, ...withoutDuplicate];
+        next.sort((a, b) =>
+          String(a.name || "").localeCompare(String(b.name || "")),
+        );
+        return next;
+      });
+      fetchAttributes();
+    },
+    [fetchAttributes],
+  );
 
   const handleAttributeDelete = useCallback(
     async (attribute, dependencyInfo) => {
@@ -70,7 +77,9 @@ export default function AttributesPage() {
       );
 
       try {
-        await api.delete(`/attributes/${snapshot.id}`);
+        await api.delete(`/attributes/${snapshot.id}`, {
+          params: { hard: true },
+        });
         toast.success("Attribute deleted successfully.");
       } catch (error) {
         setAttributes((current) => {
@@ -125,7 +134,9 @@ export default function AttributesPage() {
           : [],
       );
     } catch (error) {
-      toast.error(error?.message || "Failed to load attribute management data.");
+      toast.error(
+        error?.message || "Failed to load attribute management data.",
+      );
       setCategories([]);
       setAttributes([]);
     } finally {
@@ -139,7 +150,7 @@ export default function AttributesPage() {
 
   return (
     <div className="min-h-full bg-slate-50 px-4 py-6 md:px-6 md:py-8 lg:px-10">
-      <section className="mb-7 rounded-[2rem] border border-slate-100 bg-white p-6 shadow-sm md:p-8">
+      <section className="mb-7 rounded-4xl border border-slate-100 bg-white p-6 shadow-sm md:p-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-[#8b3dff]">
@@ -150,7 +161,8 @@ export default function AttributesPage() {
               Dynamic Attribute Management
             </h1>
             <p className="mt-2 text-sm text-slate-500">
-              Create global specifications and map them category-wise for a scalable catalog.
+              Create global specifications and map them category-wise for a
+              scalable catalog.
             </p>
           </div>
 
@@ -162,7 +174,7 @@ export default function AttributesPage() {
       </section>
 
       {isLoading ? (
-        <div className="flex items-center justify-center rounded-[2rem] border border-slate-100 bg-white px-5 py-20 text-slate-500 shadow-sm">
+        <div className="flex items-center justify-center rounded-4xl border border-slate-100 bg-white px-5 py-20 text-slate-500 shadow-sm">
           <Loader2 size={18} className="mr-2 animate-spin" />
           Loading attribute modules...
         </div>

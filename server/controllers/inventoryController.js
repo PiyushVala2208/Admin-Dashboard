@@ -667,7 +667,12 @@ const handleDeleteItem = async (req, res) => {
     res.json({ message: "Item deleted successfully!" });
   } catch (error) {
     console.error("Error deleting inventory item:", error);
-    res.status(500).send("Error deleting item");
+    if (error?.code === "ITEM_IN_ORDERS") {
+      return res.status(409).json({ message: error.message });
+    }
+    res
+      .status(500)
+      .json({ message: "Error deleting item", error: error.message });
   }
 };
 

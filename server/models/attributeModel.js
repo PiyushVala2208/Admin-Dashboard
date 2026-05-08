@@ -77,7 +77,11 @@ const ensureAttributeSoftDeleteColumns = async (client) => {
 const ensureAttributeRequiredColumn = async (client) => {
   if (hasEnsuredAttributeRequiredColumn) return;
 
-  const hasIsRequired = await tableHasColumn(client, "attributes", "is_required");
+  const hasIsRequired = await tableHasColumn(
+    client,
+    "attributes",
+    "is_required",
+  );
   if (!hasIsRequired) {
     await client.query(
       "ALTER TABLE attributes ADD COLUMN is_required boolean NOT NULL DEFAULT false",
@@ -187,7 +191,8 @@ const hydrateDependencies = async (client, attributeRows = []) => {
     await getDependencyMaps(client, attributeIds);
 
   return attributeRows.map((row) => {
-    const mapped_categories_count = mappedCategoriesMap.get(Number(row.id)) || 0;
+    const mapped_categories_count =
+      mappedCategoriesMap.get(Number(row.id)) || 0;
     const product_usage_count = productUsageMap.get(Number(row.id)) || 0;
     const variant_usage_count = variantUsageMap.get(Number(row.id)) || 0;
     const is_in_use =
@@ -281,7 +286,9 @@ const Attribute = {
     }
 
     const normalizedOptions = [
-      ...new Set(options.map((value) => String(value || "").trim()).filter(Boolean)),
+      ...new Set(
+        options.map((value) => String(value || "").trim()).filter(Boolean),
+      ),
     ];
 
     if (normalizedOptions.length === 0) {
@@ -373,7 +380,7 @@ const Attribute = {
             isObjectItem ? item.is_required || item.isRequired : false,
           );
           const sortOrder = Number.parseInt(
-            isObjectItem ? item.sort_order ?? item.sortOrder : index,
+            isObjectItem ? (item.sort_order ?? item.sortOrder) : index,
             10,
           );
 
@@ -433,7 +440,9 @@ const Attribute = {
     }
 
     const normalizedOptions = [
-      ...new Set(options.map((value) => String(value || "").trim()).filter(Boolean)),
+      ...new Set(
+        options.map((value) => String(value || "").trim()).filter(Boolean),
+      ),
     ];
 
     if (normalizedOptions.length === 0) {
@@ -503,10 +512,17 @@ const Attribute = {
       "product_attribute_values",
     );
     const hasInventoryTable = await tableExists(executor, "inventory");
-    const hasProductVariantsTable = await tableExists(executor, "product_variants");
+    const hasProductVariantsTable = await tableExists(
+      executor,
+      "product_variants",
+    );
     const hasVariantAttributesColumn =
       hasProductVariantsTable &&
-      (await tableHasColumn(executor, "product_variants", "variant_attributes"));
+      (await tableHasColumn(
+        executor,
+        "product_variants",
+        "variant_attributes",
+      ));
 
     const categoryRows = hasCategoryAttributesTable
       ? (
@@ -523,10 +539,11 @@ const Attribute = {
         ).rows
       : [];
 
-    const productSpecRows = hasProductAttributeValuesTable && hasInventoryTable
-      ? (
-          await executor.query(
-            `
+    const productSpecRows =
+      hasProductAttributeValuesTable && hasInventoryTable
+        ? (
+            await executor.query(
+              `
               SELECT DISTINCT i.id, i.name, i.category
               FROM product_attribute_values pav
               INNER JOIN inventory i ON i.id = pav.product_id
@@ -534,15 +551,16 @@ const Attribute = {
               ORDER BY i.id DESC
               LIMIT 50
             `,
-            [normalizedId],
-          )
-        ).rows
-      : [];
+              [normalizedId],
+            )
+          ).rows
+        : [];
 
-    const productVariantRows = hasVariantAttributesColumn && hasInventoryTable
-      ? (
-          await executor.query(
-            `
+    const productVariantRows =
+      hasVariantAttributesColumn && hasInventoryTable
+        ? (
+            await executor.query(
+              `
               SELECT
                 i.id,
                 i.name,
@@ -559,10 +577,10 @@ const Attribute = {
               ORDER BY i.id DESC
               LIMIT 50
             `,
-            [normalizedId],
-          )
-        ).rows
-      : [];
+              [normalizedId],
+            )
+          ).rows
+        : [];
 
     const dependencies = await Attribute.getDependencySummary(
       normalizedId,
@@ -618,6 +636,24 @@ const Attribute = {
       RETURNING id
     `;
     const { rows } = await executor.query(query, [attributeId]);
+    return rows[0] || null;
+  },
+
+  hardDeleteById: async (attributeId, client) => {
+    const executor = client || pool;
+    const hasOptionsTable = await tableExists(executor, "attribute_options");
+
+    if (hasOptionsTable) {
+      await executor.query(
+        "DELETE FROM attribute_options WHERE attribute_id = $1",
+        [attributeId],
+      );
+    }
+
+    const { rows } = await executor.query(
+      "DELETE FROM attributes WHERE id = $1 RETURNING id",
+      [attributeId],
+    );
     return rows[0] || null;
   },
 };

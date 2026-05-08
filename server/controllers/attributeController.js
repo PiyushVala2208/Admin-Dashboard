@@ -9,7 +9,11 @@ const normalizeName = (value = "") => String(value || "").trim();
 
 const normalizeOptions = (options = []) =>
   Array.isArray(options)
-    ? [...new Set(options.map((option) => String(option || "").trim()).filter(Boolean))]
+    ? [
+        ...new Set(
+          options.map((option) => String(option || "").trim()).filter(Boolean),
+        ),
+      ]
     : [];
 
 const normalizeAttributeMappings = (payload) => {
@@ -28,7 +32,7 @@ const normalizeAttributeMappings = (payload) => {
         isObjectItem ? item.is_required || item.isRequired : false,
       );
       const sortOrder = Number.parseInt(
-        isObjectItem ? item.sort_order ?? item.sortOrder : index,
+        isObjectItem ? (item.sort_order ?? item.sortOrder) : index,
         10,
       );
 
@@ -79,7 +83,10 @@ const createAttribute = async (req, res) => {
     }
 
     if (hasCategoryId) {
-      if (!Number.isInteger(normalizedCategoryId) || normalizedCategoryId <= 0) {
+      if (
+        !Number.isInteger(normalizedCategoryId) ||
+        normalizedCategoryId <= 0
+      ) {
         return res.status(400).json({
           success: false,
           message: "Valid category ID is required for mapping.",
@@ -115,10 +122,9 @@ const createAttribute = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message:
-        hasCategoryId
-          ? "Attribute created and mapped successfully!"
-          : "Attribute created successfully!",
+      message: hasCategoryId
+        ? "Attribute created and mapped successfully!"
+        : "Attribute created successfully!",
       data: newAttr,
     });
   } catch (error) {
@@ -200,8 +206,7 @@ const updateAttribute = async (req, res) => {
     if (isTypeChanging && existingAttribute.is_in_use) {
       return res.status(409).json({
         success: false,
-        message:
-          "This attribute is in use, so its type cannot be changed.",
+        message: "This attribute is in use, so its type cannot be changed.",
       });
     }
 
@@ -306,6 +311,7 @@ const getAttributeDependencies = async (req, res) => {
 const deleteAttribute = async (req, res) => {
   const { id: rawId } = req.params;
   const attributeId = Number.parseInt(rawId, 10);
+  const hardDelete = String(req.query?.hard || "").toLowerCase() === "true";
 
   if (!Number.isInteger(attributeId) || attributeId <= 0) {
     return res.status(400).json({
@@ -347,7 +353,9 @@ const deleteAttribute = async (req, res) => {
     await client.query("BEGIN");
     hasActiveTransaction = true;
     await Attribute.removeMappings(attributeId, client);
-    const deleted = await Attribute.softDeleteById(attributeId, client);
+    const deleted = hardDelete
+      ? await Attribute.hardDeleteById(attributeId, client)
+      : await Attribute.softDeleteById(attributeId, client);
 
     if (!deleted) {
       await client.query("ROLLBACK");
@@ -362,7 +370,9 @@ const deleteAttribute = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Attribute deleted successfully",
+      message: hardDelete
+        ? "Attribute deleted permanently"
+        : "Attribute deleted successfully",
       data: {
         id: attributeId,
         removed_mappings_count: dependencies.mapped_categories_count || 0,
