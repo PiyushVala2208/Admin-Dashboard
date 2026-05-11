@@ -3,7 +3,6 @@
 import { memo } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 
-// Props: { onEdit, onDelete }
 function AttributeActionButtons({ onEdit, onDelete }) {
   return (
     <div className="flex items-center gap-2 opacity-0 transition group-hover:opacity-100">

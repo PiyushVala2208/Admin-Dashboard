@@ -97,6 +97,16 @@ const sanitizeVariant = (variant = {}, index = 0) => {
     ),
   ];
 
+  const rawSale =
+    variant.variant_sale_price ?? variant.sale_price ?? variant.salePrice;
+  const parsedSale = Number.parseFloat(rawSale);
+  const variant_sale_price =
+    rawSale === "" || rawSale === undefined || rawSale === null
+      ? null
+      : Number.isFinite(parsedSale) && parsedSale >= 0
+        ? parsedSale
+        : null;
+
   return {
     ...variant,
     label: normalizedLabel,
@@ -104,6 +114,7 @@ const sanitizeVariant = (variant = {}, index = 0) => {
     color: inferredColor,
     sku: variant.sku?.trim() || null,
     variant_price: Number.parseFloat(variant.variant_price ?? variant.price) || 0,
+    variant_sale_price,
     variant_stock:
       Number.parseInt(variant.variant_stock ?? variant.stock, 10) || 0,
     variant_image: cleanedImages[0] || null,
@@ -264,6 +275,19 @@ const validateVariantDefinitions = (
     if (!Number.isFinite(Number(variant.variant_price)) || Number(variant.variant_price) < 0) {
       return {
         error: `${label} has an invalid price.`,
+      };
+    }
+
+    const saleRaw =
+      variant.variant_sale_price ?? variant.sale_price ?? variant.salePrice;
+    if (
+      saleRaw !== "" &&
+      saleRaw !== undefined &&
+      saleRaw !== null &&
+      (!Number.isFinite(Number.parseFloat(saleRaw)) || Number.parseFloat(saleRaw) < 0)
+    ) {
+      return {
+        error: `${label} has an invalid sale price.`,
       };
     }
 

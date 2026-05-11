@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Plus, Save, Tag, X } from "lucide-react";
 import { ATTRIBUTE_TYPES } from "@/components/Attributes/attributeUtils";
 
-// Props: { isOpen, attributeName, name, type, isRequired, options, optionInput, isTypeLocked, isDirty, isSaving, onClose, onNameChange, onTypeChange, onToggleRequired, onOptionInputChange, onAddOption, onRemoveOption, onSave }
 function AttributeEditDrawer({
   isOpen,
   attributeName,

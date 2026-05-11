@@ -120,6 +120,159 @@ export const syncVariantsForSelection = (variants = [], selectedIds = []) => {
   });
 };
 
+/** @param {number[]} subAttributeIds */
+export const createEmptySubVariant = (subAttributeIds = []) => ({
+  clientKey: `sub-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+  subAttributes: subAttributeIds.map((attributeId) => ({
+    attributeId: Number(attributeId),
+    value: "",
+  })),
+  price: "",
+  salePrice: "",
+  stock: "",
+  sku: "",
+});
+
+/**
+ * @param {number} primaryAttributeId
+ * @param {string} primaryValue
+ * @param {number[]} subAttributeIds
+ */
+export const createEmptyVariantGroup = (
+  primaryAttributeId,
+  primaryValue,
+  subAttributeIds = [],
+) => ({
+  clientKey: `grp-${sanitizeSkuToken(primaryValue) || "GROUP"}-${Date.now()}`,
+  primaryAttributeId: Number(primaryAttributeId),
+  primaryValue: String(primaryValue || "").trim(),
+  groupImage: "",
+  subVariants: [createEmptySubVariant(subAttributeIds)],
+});
+
+export const subVariantAttributeKey = (subAttributes = []) => {
+  const normalized = Array.isArray(subAttributes)
+    ? [...subAttributes]
+        .map((item) => ({
+          attributeId: Number(item.attributeId),
+          value: String(item.value || "")
+            .trim()
+            .toLowerCase(),
+        }))
+        .filter((item) => Number.isInteger(item.attributeId) && item.attributeId > 0)
+        .sort((a, b) => a.attributeId - b.attributeId)
+    : [];
+  if (!normalized.length) return "base";
+  return normalized.map((item) => `${item.attributeId}:${item.value}`).join("|");
+};
+
+/**
+ * Ensure each sub-variant row has an entry per subAttributeId (stable order).
+ * @param {Array<{ subAttributes?: Array<{ attributeId: number, value: string }> }>} rows
+ * @param {number[]} subAttributeIds
+ */
+export const alignSubVariantAttributeSlots = (rows = [], subAttributeIds = []) => {
+  const ids = subAttributeIds
+    .map((id) => Number(id))
+    .filter((id) => Number.isInteger(id) && id > 0);
+
+  return (Array.isArray(rows) ? rows : []).map((row) => {
+    const map = new Map(
+      (Array.isArray(row.subAttributes) ? row.subAttributes : []).map((item) => [
+        Number(item.attributeId),
+        String(item.value || ""),
+      ]),
+    );
+    return {
+      ...row,
+      subAttributes: ids.map((attributeId) => ({
+        attributeId,
+        value: map.get(attributeId) ?? "",
+      })),
+    };
+  });
+};
+
+/**
+ * Flatten hierarchical groups to API-ready variant rows (product_variants + variant_attributes).
+ * @param {Array<{
+ *   primaryAttributeId: number,
+ *   primaryValue: string,
+ *   groupImage?: string,
+ *   subVariants?: Array<{
+ *     subAttributes?: Array<{ attributeId: number, value: string }>,
+ *     price: string|number,
+ *     salePrice?: string|number,
+ *     stock: string|number,
+ *     sku: string,
+ *   }>
+ * }>} groups
+ */
+export const flattenVariantGroupsForApi = (groups = []) => {
+  const rows = [];
+  for (const group of groups) {
+    const primaryId = Number(group?.primaryAttributeId);
+    const primaryVal = String(group?.primaryValue || "").trim();
+    const groupImage = String(group?.groupImage || "").trim();
+    const subs = Array.isArray(group?.subVariants) ? group.subVariants : [];
+
+    for (const sub of subs) {
+      const subAttrsRaw = Array.isArray(sub?.subAttributes) ? sub.subAttributes : [];
+      const subAttrs = subAttrsRaw
+        .map((item) => ({
+          attributeId: Number(item.attributeId),
+          value: String(item.value || "").trim(),
+        }))
+        .filter(
+          (item) =>
+            Number.isInteger(item.attributeId) &&
+            item.attributeId > 0 &&
+            item.value,
+        );
+
+      const variant_attributes = [];
+      if (Number.isInteger(primaryId) && primaryId > 0 && primaryVal) {
+        variant_attributes.push({ attributeId: primaryId, value: primaryVal });
+      }
+      variant_attributes.push(...subAttrs);
+
+      rows.push({
+        variant_attributes,
+        price: sub?.price ?? "",
+        salePrice: sub?.salePrice ?? "",
+        stock: sub?.stock ?? "",
+        sku: String(sub?.sku || "").trim(),
+        images: groupImage ? [groupImage] : [],
+      });
+    }
+  }
+  return rows;
+};
+
+/**
+ * Cartesian combinations for sub-attributes (e.g. all Size options, or Size×Material).
+ * @param {Array<{ id: number|string, options?: string[] }>} subAttributeDefinitions
+ */
+export const buildSubAttributeCombinations = (subAttributeDefinitions = []) => {
+  const attrs = (Array.isArray(subAttributeDefinitions) ? subAttributeDefinitions : [])
+    .map((a) => ({
+      id: Number(a.id),
+      options: [...new Set((a.options || []).map((o) => String(o || "").trim()).filter(Boolean))],
+    }))
+    .filter((a) => Number.isInteger(a.id) && a.id > 0 && a.options.length > 0);
+
+  if (!attrs.length) return [];
+
+  return attrs.reduce((accumulator, attr) => {
+    if (!accumulator.length) {
+      return attr.options.map((value) => [{ attributeId: attr.id, value }]);
+    }
+    return accumulator.flatMap((combo) =>
+      attr.options.map((value) => [...combo, { attributeId: attr.id, value }]),
+    );
+  }, []);
+};
+
 export const renderSpecField = ({
   attribute,
   value,

@@ -4,7 +4,6 @@ import { memo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, Loader2, ShieldAlert, Trash2 } from "lucide-react";
 
-// Props: { isOpen, onClose, dependencyInfo, isCheckingDependencies, totalUsageCount, isDeleteBlocked, isDeleting, onDelete }
 function AttributeDeleteModal({
   isOpen,
   onClose,

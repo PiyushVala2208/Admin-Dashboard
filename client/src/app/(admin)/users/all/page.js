@@ -44,7 +44,6 @@ export default function AllUserPage() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUsers();
   }, []);
 

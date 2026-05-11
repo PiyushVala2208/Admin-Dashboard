@@ -2,7 +2,9 @@ const pool = require("../db");
 
 let hasEnsuredVariantAttributesColumn = false;
 let hasEnsuredVariantImagesColumn = false;
+let hasEnsuredVariantSalePriceColumn = false;
 let hasEnsuredInventorySoftDeleteColumns = false;
+let hasEnsuredInventoryVariantsColumn = false;
 
 const tableExists = async (client, tableName) => {
   const query = `
@@ -63,6 +65,23 @@ const ensureVariantImagesColumn = async (client) => {
   hasEnsuredVariantImagesColumn = true;
 };
 
+const ensureVariantSalePriceColumn = async (client) => {
+  if (hasEnsuredVariantSalePriceColumn) return;
+
+  const hasSale = await tableHasColumn(
+    client,
+    "product_variants",
+    "variant_sale_price",
+  );
+  if (!hasSale) {
+    await client.query(
+      "ALTER TABLE product_variants ADD COLUMN variant_sale_price numeric NULL",
+    );
+  }
+
+  hasEnsuredVariantSalePriceColumn = true;
+};
+
 const ensureInventorySoftDeleteColumns = async (client) => {
   if (hasEnsuredInventorySoftDeleteColumns) return;
 
@@ -81,6 +100,23 @@ const ensureInventorySoftDeleteColumns = async (client) => {
   }
 
   hasEnsuredInventorySoftDeleteColumns = true;
+};
+
+const ensureInventoryVariantsColumn = async (client) => {
+  if (hasEnsuredInventoryVariantsColumn) return;
+
+  const hasHasVariants = await tableHasColumn(
+    client,
+    "inventory",
+    "has_variants",
+  );
+  if (!hasHasVariants) {
+    await client.query(
+      "ALTER TABLE inventory ADD COLUMN has_variants boolean NOT NULL DEFAULT false",
+    );
+  }
+
+  hasEnsuredInventoryVariantsColumn = true;
 };
 
 const normalizeVariantAttributes = (variantAttributes = []) => {
@@ -118,11 +154,22 @@ const mapVariantValues = (variant = {}) => {
     ),
   ];
 
+  const rawSale =
+    variant.variant_sale_price ?? variant.sale_price ?? variant.salePrice;
+  const parsedSale = Number.parseFloat(rawSale);
+  const variant_sale_price =
+    rawSale === "" || rawSale === undefined || rawSale === null
+      ? null
+      : Number.isFinite(parsedSale) && parsedSale >= 0
+        ? parsedSale
+        : null;
+
   return {
     size: variant.size || variant.label || null,
     color: variant.color || null,
     variant_price:
       Number.parseFloat(variant.variant_price ?? variant.price) || 0,
+    variant_sale_price,
     variant_stock:
       Number.parseInt(variant.variant_stock ?? variant.stock, 10) || 0,
     sku: variant.sku || `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -242,6 +289,7 @@ const getItemById = async (id, userId) => {
 };
 
 const createItem = async (client, productData) => {
+  await ensureInventoryVariantsColumn(client);
   const supportsCategoryId = await tableHasColumn(
     client,
     "inventory",
@@ -283,6 +331,7 @@ const createItem = async (client, productData) => {
 const createVariant = async (client, productId, variant, isDefault = false) => {
   await ensureVariantAttributesColumn(client);
   await ensureVariantImagesColumn(client);
+  await ensureVariantSalePriceColumn(client);
 
   const mappedVariant = mapVariantValues({
     ...variant,
@@ -291,9 +340,9 @@ const createVariant = async (client, productId, variant, isDefault = false) => {
 
   const query = `
     INSERT INTO product_variants (
-      product_id, size, color, variant_price, variant_stock, sku, variant_image, variant_images, is_default, variant_attributes
+      product_id, size, color, variant_price, variant_sale_price, variant_stock, sku, variant_image, variant_images, is_default, variant_attributes
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11::jsonb)
     RETURNING *
   `;
 
@@ -302,6 +351,7 @@ const createVariant = async (client, productId, variant, isDefault = false) => {
     mappedVariant.size,
     mappedVariant.color,
     mappedVariant.variant_price,
+    mappedVariant.variant_sale_price,
     mappedVariant.variant_stock,
     mappedVariant.sku,
     mappedVariant.variant_image,
@@ -312,6 +362,7 @@ const createVariant = async (client, productId, variant, isDefault = false) => {
 };
 
 const updateItem = async (client, id, productData) => {
+  await ensureInventoryVariantsColumn(client);
   const supportsCategoryId = await tableHasColumn(
     client,
     "inventory",
@@ -353,6 +404,7 @@ const updateItem = async (client, id, productData) => {
 const updateVariant = async (client, variantId, variant) => {
   await ensureVariantAttributesColumn(client);
   await ensureVariantImagesColumn(client);
+  await ensureVariantSalePriceColumn(client);
 
   const mappedVariant = mapVariantValues(variant);
 
@@ -361,13 +413,14 @@ const updateVariant = async (client, variantId, variant) => {
     SET size = $1,
         color = $2,
         variant_price = $3,
-        variant_stock = $4,
-        sku = $5,
-        variant_image = $6,
-        variant_images = $7::jsonb,
-        is_default = $8,
-        variant_attributes = $9::jsonb
-    WHERE id = $10
+        variant_sale_price = $4,
+        variant_stock = $5,
+        sku = $6,
+        variant_image = $7,
+        variant_images = $8::jsonb,
+        is_default = $9,
+        variant_attributes = $10::jsonb
+    WHERE id = $11
     RETURNING *
   `;
 
@@ -375,6 +428,7 @@ const updateVariant = async (client, variantId, variant) => {
     mappedVariant.size,
     mappedVariant.color,
     mappedVariant.variant_price,
+    mappedVariant.variant_sale_price,
     mappedVariant.variant_stock,
     mappedVariant.sku,
     mappedVariant.variant_image,

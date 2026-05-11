@@ -124,13 +124,19 @@ const getDependencyMaps = async (client, attributeIds = []) => {
     client,
     "product_attribute_values",
   );
+  const hasInventoryTable = await tableExists(client, "inventory");
+  const hasInventoryIsActiveColumn = hasInventoryTable
+    ? await tableHasColumn(client, "inventory", "is_active")
+    : false;
   const productUsageRes = hasProductAttributeValuesTable
     ? await client.query(
         `
-          SELECT attribute_id, COUNT(*)::int AS usage_count
-          FROM product_attribute_values
-          WHERE attribute_id = ANY($1::int[])
-          GROUP BY attribute_id
+          SELECT pav.attribute_id, COUNT(*)::int AS usage_count
+          FROM product_attribute_values pav
+          ${hasInventoryTable ? "INNER JOIN inventory i ON i.id = pav.product_id" : ""}
+          WHERE pav.attribute_id = ANY($1::int[])
+          ${hasInventoryIsActiveColumn ? "AND i.is_active = true" : ""}
+          GROUP BY pav.attribute_id
         `,
         [normalizedIds],
       )
@@ -146,11 +152,13 @@ const getDependencyMaps = async (client, attributeIds = []) => {
             (entry.value->>'attributeId')::int AS attribute_id,
             COUNT(*)::int AS usage_count
           FROM product_variants pv
+          ${hasInventoryTable ? "INNER JOIN inventory i ON i.id = pv.product_id" : ""}
           CROSS JOIN LATERAL jsonb_array_elements(COALESCE(pv.variant_attributes, '[]'::jsonb)) AS entry(value)
           WHERE
             jsonb_typeof(entry.value) = 'object'
             AND (entry.value->>'attributeId') ~ '^[0-9]+$'
             AND (entry.value->>'attributeId')::int = ANY($1::int[])
+            ${hasInventoryIsActiveColumn ? "AND i.is_active = true" : ""}
           GROUP BY (entry.value->>'attributeId')::int
         `,
         [normalizedIds],
@@ -512,6 +520,9 @@ const Attribute = {
       "product_attribute_values",
     );
     const hasInventoryTable = await tableExists(executor, "inventory");
+    const hasInventoryIsActiveColumn = hasInventoryTable
+      ? await tableHasColumn(executor, "inventory", "is_active")
+      : false;
     const hasProductVariantsTable = await tableExists(
       executor,
       "product_variants",
@@ -548,6 +559,7 @@ const Attribute = {
               FROM product_attribute_values pav
               INNER JOIN inventory i ON i.id = pav.product_id
               WHERE pav.attribute_id = $1
+              ${hasInventoryIsActiveColumn ? "AND i.is_active = true" : ""}
               ORDER BY i.id DESC
               LIMIT 50
             `,
@@ -573,6 +585,7 @@ const Attribute = {
                 jsonb_typeof(entry.value) = 'object'
                 AND (entry.value->>'attributeId') ~ '^[0-9]+$'
                 AND (entry.value->>'attributeId')::int = $1
+                ${hasInventoryIsActiveColumn ? "AND i.is_active = true" : ""}
               GROUP BY i.id, i.name, i.category
               ORDER BY i.id DESC
               LIMIT 50

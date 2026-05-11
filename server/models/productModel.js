@@ -22,6 +22,22 @@ const tableHasColumn = async (client, tableName, columnName) => {
   return result.rowCount > 0;
 };
 
+const ensureInventorySoftDeleteColumns = async (client) => {
+  const hasIsActive = await tableHasColumn(client, "inventory", "is_active");
+  if (!hasIsActive) {
+    await client.query(
+      "ALTER TABLE inventory ADD COLUMN is_active boolean NOT NULL DEFAULT true",
+    );
+  }
+
+  const hasDeletedAt = await tableHasColumn(client, "inventory", "deleted_at");
+  if (!hasDeletedAt) {
+    await client.query(
+      "ALTER TABLE inventory ADD COLUMN deleted_at timestamptz NULL",
+    );
+  }
+};
+
 const normalizeVariant = (variant = {}, index = 0) => {
   const normalizedImages = Array.isArray(variant.variant_images)
     ? variant.variant_images
@@ -34,13 +50,26 @@ const normalizeVariant = (variant = {}, index = 0) => {
         ).trim(),
       ];
   const images = [
-    ...new Set(normalizedImages.map((item) => String(item || "").trim()).filter(Boolean)),
+    ...new Set(
+      normalizedImages.map((item) => String(item || "").trim()).filter(Boolean),
+    ),
   ];
+
+  const rawSale = variant.variant_sale_price ?? variant.sale_price;
+  const parsedSale = Number.parseFloat(rawSale);
+  const variant_sale_price =
+    rawSale === "" || rawSale === undefined || rawSale === null
+      ? null
+      : Number.isFinite(parsedSale) && parsedSale >= 0
+        ? parsedSale
+        : null;
 
   return {
     ...variant,
     is_default:
-      typeof variant.is_default === "boolean" ? variant.is_default : index === 0,
+      typeof variant.is_default === "boolean"
+        ? variant.is_default
+        : index === 0,
     variant_attributes: Array.isArray(variant.variant_attributes)
       ? variant.variant_attributes
       : [],
@@ -48,6 +77,7 @@ const normalizeVariant = (variant = {}, index = 0) => {
     images,
     variant_image: images[0] || null,
     price: Number(variant.variant_price ?? variant.price ?? 0),
+    variant_sale_price,
     stock: Number(variant.variant_stock ?? variant.stock ?? 0),
   };
 };
@@ -62,6 +92,7 @@ const Product = {
     offset,
     search,
   }) => {
+    await ensureInventorySoftDeleteColumns(pool);
     let query = `
       SELECT
         i.*,
@@ -94,7 +125,7 @@ const Product = {
         LIMIT 1
       ) vd ON true
       LEFT JOIN categories c ON i.category = c.slug OR i.category = c.name
-      WHERE 1 = 1
+      WHERE i.is_active = true
     `;
 
     const values = [];
@@ -125,7 +156,8 @@ const Product = {
       count++;
     }
 
-    if (sortBy === "price_low") query += ` ORDER BY COALESCE(vs.starting_from_price, 0) ASC`;
+    if (sortBy === "price_low")
+      query += ` ORDER BY COALESCE(vs.starting_from_price, 0) ASC`;
     else if (sortBy === "price_high")
       query += ` ORDER BY COALESCE(vs.starting_from_price, 0) DESC`;
     else query += ` ORDER BY i.id DESC`;
@@ -139,11 +171,13 @@ const Product = {
       price: Number(row.starting_from_price || 0),
       starting_from_price: Number(row.starting_from_price || 0),
       stock: Number(row.stock || 0),
-      has_variants: Number(row.variant_count || 0) > 1 || Boolean(row.has_variants),
+      has_variants:
+        Number(row.variant_count || 0) > 1 || Boolean(row.has_variants),
     }));
   },
 
   getTotalCount: async ({ category, minPrice, maxPrice, search }) => {
+    await ensureInventorySoftDeleteColumns(pool);
     let query = `
       SELECT COUNT(*)
       FROM inventory i
@@ -153,7 +187,7 @@ const Product = {
         WHERE pv.product_id = i.id
       ) vs ON true
       LEFT JOIN categories c ON i.category = c.slug OR i.category = c.name
-      WHERE 1 = 1
+      WHERE i.is_active = true
     `;
 
     const values = [];
@@ -193,6 +227,7 @@ const Product = {
 
   getProductById: async (id) => {
     try {
+      await ensureInventorySoftDeleteColumns(pool);
       const hasAttributeValuesTable = await tableExists(
         pool,
         "product_attribute_values",
@@ -211,7 +246,7 @@ const Product = {
         SELECT i.*, c.id AS category_id, c.name AS category_name, c.slug AS category_slug
         FROM inventory i
         LEFT JOIN categories c ON i.category = c.slug OR i.category = c.name
-        WHERE i.id = $1
+        WHERE i.id = $1 AND i.is_active = true
         LIMIT 1
       `;
 
