@@ -10,6 +10,7 @@ import EditInventoryModal from "@/components/edit-inventory/EditInventoryModal";
 import ProductSummaryCard from "@/components/info-inventory/ProductSummaryCard";
 import InventoryActivityCard from "@/components/info-inventory/InventoryActivityCard";
 import InventoryActionsCard from "@/components/info-inventory/InventoryActionsCard";
+import ProductAttributesCard from "@/components/info-inventory/ProductAttributesCard";
 
 export default function ItemInfoPage() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function ItemInfoPage() {
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeletingVariant, setIsDeletingVariant] = useState(false);
+  const [categoryAttributes, setCategoryAttributes] = useState([]);
 
   const [selectedColor, setSelectedColor] = useState("");
   const [selectedVariant, setSelectedVariant] = useState(null);
@@ -67,6 +69,82 @@ export default function ItemInfoPage() {
       active = false;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!item) {
+      setCategoryAttributes([]);
+      return;
+    }
+
+    let active = true;
+
+    const fetchCategoryAttributes = async () => {
+      const rawCategoryId =
+        item?.category_id ?? item?.categoryId ?? item?.category?.id ?? null;
+      let categoryId = Number.parseInt(rawCategoryId, 10);
+
+      if (!Number.isInteger(categoryId) || categoryId <= 0) {
+        const rawCategoryName =
+          item?.category_name ?? item?.category ?? item?.category?.name ?? "";
+        const normalizedName = String(rawCategoryName || "")
+          .trim()
+          .toLowerCase();
+
+        if (normalizedName) {
+          try {
+            const categoriesResponse = await api.get("/categories");
+            const categories = Array.isArray(categoriesResponse.data?.data)
+              ? categoriesResponse.data.data
+              : [];
+            const matched = categories.find((category) => {
+              const name = String(category?.name || "")
+                .trim()
+                .toLowerCase();
+              const slug = String(category?.slug || "")
+                .trim()
+                .toLowerCase();
+              return name === normalizedName || slug === normalizedName;
+            });
+            categoryId = Number.parseInt(matched?.id, 10);
+          } catch {
+            categoryId = null;
+          }
+        }
+      }
+
+      if (!Number.isInteger(categoryId) || categoryId <= 0) {
+        if (!active) return;
+        setCategoryAttributes([]);
+        return;
+      }
+
+      try {
+        const response = await api.get(`/attributes/category/${categoryId}`);
+        const attributes = Array.isArray(response.data?.data)
+          ? response.data.data
+          : [];
+        if (!active) return;
+        setCategoryAttributes(attributes);
+      } catch {
+        if (!active) return;
+        setCategoryAttributes([]);
+      }
+    };
+
+    fetchCategoryAttributes();
+
+    return () => {
+      active = false;
+    };
+  }, [
+    item,
+    item?.category_id,
+    item?.categoryId,
+    item?.category?.id,
+    item?.category,
+    item?.category_name,
+    item?.category?.name,
+  ]);
 
   const uniqueColors = useMemo(() => {
     if (!Array.isArray(item?.variants)) return [];
@@ -184,6 +262,32 @@ export default function ItemInfoPage() {
     }
   };
 
+  const productAttributes = useMemo(() => {
+    const specMap = new Map(
+      (item?.specifications || []).map((entry) => [
+        Number(entry.attributeId ?? entry.attribute_id),
+        String(entry.value || "").trim(),
+      ]),
+    );
+
+    if (categoryAttributes.length === 0) {
+      return [];
+    }
+
+    return categoryAttributes
+      .filter((attribute) => {
+        const type = String(attribute.type || "").toLowerCase();
+        return type === "text" || type === "number";
+      })
+      .map((attribute) => ({
+        id: attribute.id,
+        name: attribute.name,
+        type: attribute.type,
+        is_required: Boolean(attribute.is_required),
+        value: specMap.get(Number(attribute.id)) || "",
+      }));
+  }, [categoryAttributes, item?.specifications]);
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -265,6 +369,8 @@ export default function ItemInfoPage() {
             displayStock={Number(displayStock) || 0}
             totalVariants={item.variants?.length || 0}
           />
+
+          <ProductAttributesCard attributes={productAttributes} />
 
           <InventoryActionsCard
             onEdit={() => setIsEditModalOpen(true)}
