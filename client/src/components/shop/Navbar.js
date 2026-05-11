@@ -132,7 +132,10 @@ export default function Navbar() {
     { name: "My Orders", href: "/my-orders" },
   ];
 
-  const isActive = (path) => pathname === path;
+  const isActive = (path) => {
+    if (path === "/") return pathname === "/";
+    return pathname === path || pathname.startsWith(`${path}/`);
+  };
 
   return (
     <>
