@@ -3,7 +3,6 @@
 import { memo } from "react";
 import Image from "next/image";
 
-// Props: { productName, displayImage, galleryImages, activeImageIndex, onSelectImage, isOutOfStock, fallbackImage }
 function ImageGallery({
   productName,
   displayImage,

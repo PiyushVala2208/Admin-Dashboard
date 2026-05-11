@@ -2,6 +2,7 @@
 
 import { memo } from "react";
 import { Minus, Plus } from "lucide-react";
+import { span } from "framer-motion/client";
 
 const isColorAttribute = (name = "") =>
   ["color", "colour"].includes(String(name).trim().toLowerCase());
@@ -24,7 +25,7 @@ const getSwatchStyle = (value = "") => {
     silver: "#cbd5e1",
     gold: "#f59e0b",
     navy: "#1e3a8a",
-    beige: "#d6d3d1",
+    beige: "#F5F5DC",
     brown: "#92400e",
     orange: "#f97316",
   };
@@ -33,7 +34,6 @@ const getSwatchStyle = (value = "") => {
   return normalized || "#cbd5e1";
 };
 
-// Props: { variationAttributes, selectedOptions, onOptionChange, isOutOfStock, selectedQuantity, onQuantityChange, displayStock }
 function VariantPicker({
   variationAttributes,
   selectedOptions,
@@ -42,6 +42,7 @@ function VariantPicker({
   selectedQuantity,
   onQuantityChange,
   displayStock,
+  optionAvailability,
 }) {
   return (
     <>
@@ -58,17 +59,31 @@ function VariantPicker({
                   {attribute.options.map((option) => {
                     const isSelected = selectedValue === option;
                     const isSwatch = isColorAttribute(attribute.name);
+                    const isAvailable = optionAvailability?.[
+                      attribute.attributeId
+                    ]
+                      ? optionAvailability[attribute.attributeId][option] !==
+                        false
+                      : true;
+                    const isDisabled = !isAvailable;
                     return (
                       <button
                         key={`${attribute.attributeId}-${option}`}
                         type="button"
                         onClick={() =>
-                          onOptionChange(attribute.attributeId, option)
+                          isDisabled
+                            ? null
+                            : onOptionChange(attribute.attributeId, option)
                         }
-                        className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-bold uppercase tracking-wide transition-all ${
+                        aria-disabled={isDisabled}
+                        className={`relative inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-bold uppercase tracking-wide transition-all ${
                           isSelected
                             ? "border-[#8b3dff] bg-violet-50 text-[#8b3dff]"
                             : "border-slate-200 bg-white text-slate-600 hover:border-violet-200"
+                        } ${
+                          isDisabled
+                            ? "cursor-not-allowed opacity-60 grayscale"
+                            : ""
                         }`}
                       >
                         {isSwatch ? (
@@ -78,6 +93,7 @@ function VariantPicker({
                           />
                         ) : null}
                         {option}
+                        
                       </button>
                     );
                   })}

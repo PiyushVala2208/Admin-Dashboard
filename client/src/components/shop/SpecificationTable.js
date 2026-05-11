@@ -2,13 +2,12 @@
 
 import { memo } from "react";
 
-// Props: { technicalSpecs, attributeDefinitionMap }
 function SpecificationTable({ technicalSpecs, attributeDefinitionMap }) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
         <h3 className="text-xs font-black uppercase tracking-[0.16em] text-slate-700">
-          Technical Specifications
+          Product Details
         </h3>
       </div>
       {technicalSpecs.length > 0 ? (
