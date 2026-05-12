@@ -223,6 +223,70 @@ export const sanitizeWishlistItem = (item) => {
     return null;
   }
 
+  const normalizedAttributes = Array.isArray(item.selectedAttributes)
+    ? item.selectedAttributes
+        .map((entry) => {
+          if (!entry || typeof entry !== "object") return null;
+          const attributeId = Number(entry.attributeId ?? entry.attribute_id);
+          const name = cleanString(entry.name || entry.attribute_name);
+          const value = cleanString(entry.value || entry.attribute_value);
+          if (!value) return null;
+          return {
+            attributeId: Number.isInteger(attributeId) ? attributeId : null,
+            name:
+              name ||
+              (Number.isInteger(attributeId)
+                ? `Attribute ${attributeId}`
+                : "Attribute"),
+            value,
+          };
+        })
+        .filter(Boolean)
+    : [];
+
+  const fallbackVariant =
+    item?.variant_id != null && Array.isArray(item?.variants)
+      ? item.variants.find(
+          (variant) => String(variant?.id) === String(item.variant_id),
+        )
+      : null;
+  const fallbackAttributes = Array.isArray(fallbackVariant?.variant_attributes)
+    ? fallbackVariant.variant_attributes
+        .map((entry) => {
+          if (!entry || typeof entry !== "object") return null;
+          const attributeId = Number(entry.attributeId ?? entry.attribute_id);
+          const name = cleanString(
+            entry.attributeName || entry.attribute_name || entry.name,
+          );
+          const value = cleanString(entry.value || entry.attribute_value);
+          if (!value) return null;
+          return {
+            attributeId: Number.isInteger(attributeId) ? attributeId : null,
+            name:
+              name ||
+              (Number.isInteger(attributeId)
+                ? `Attribute ${attributeId}`
+                : "Attribute"),
+            value,
+          };
+        })
+        .filter(Boolean)
+    : [];
+
+  const selectedAttributes =
+    normalizedAttributes.length > 0 ? normalizedAttributes : fallbackAttributes;
+  const selectedAttributeCount = Number(
+    item.selectedAttributeCount ?? selectedAttributes.length,
+  );
+  const variationAttributeCount = Number(item.variationAttributeCount ?? 0);
+  const isSelectionComplete =
+    item.isSelectionComplete === true ||
+    (item.variant_id != null && variationAttributeCount === 0)
+      ? true
+      : variationAttributeCount > 0
+        ? selectedAttributeCount >= variationAttributeCount
+        : item.variant_id != null;
+
   const normalizedStock = Math.max(
     0,
     toPositiveInt(item.stock, toPositiveInt(item.variant_stock, 0)),
@@ -243,6 +307,10 @@ export const sanitizeWishlistItem = (item) => {
     variant_id: item.variant_id ?? null,
     selectedColor: cleanString(item.selectedColor),
     selectedSize: cleanString(item.selectedSize),
+    selectedAttributes,
+    selectedAttributeCount,
+    variationAttributeCount,
+    isSelectionComplete,
     has_variants: Boolean(item.has_variants),
     variant_price: toNumber(item.variant_price, toNumber(item.price)),
     variant_stock: normalizedVariantStock,
@@ -372,11 +440,7 @@ export const saveWishlist = (items) => {
     .filter(Boolean);
   const finalItems = dedupeItemsByKey(sanitizedItems, getWishlistItemKey);
 
-  return persistSnapshot(
-    WISHLIST_KEY,
-    finalItems,
-    JSON.stringify(finalItems),
-  );
+  return persistSnapshot(WISHLIST_KEY, finalItems, JSON.stringify(finalItems));
 };
 
 const clearStoredList = (key) => {
