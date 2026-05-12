@@ -10,6 +10,7 @@ import ProductHeader from "@/components/shop/ProductHeader";
 import ProductGrid from "@/components/shop/ProductGrid";
 import {
   dispatchCartSync,
+  getWishlistItemKey,
   loadWishlist,
   saveWishlist,
 } from "@/app/utils/browserStorage";
@@ -102,7 +103,9 @@ function ProductPageInner() {
       });
 
       if (response.data.success) {
-        setProducts(Array.isArray(response.data.data) ? response.data.data : []);
+        setProducts(
+          Array.isArray(response.data.data) ? response.data.data : [],
+        );
         setTotalPages(Number(response.data.pagination?.totalPages || 1));
       }
     } catch (error) {
@@ -133,46 +136,51 @@ function ProductPageInner() {
 
   const toggleWishlist = (product) => {
     const savedWishlist = loadWishlist();
-    const isExist = savedWishlist.some((item) => item.id === product.id);
+    const defaultVariant =
+      product.variants?.find((v) => v.is_default) ||
+      product.variants?.[0] ||
+      (product.variant_id ||
+      product.variant_color ||
+      product.variant_size ||
+      product.variant_image
+        ? {
+            id: product.variant_id,
+            color: product.variant_color,
+            size: product.variant_size,
+            variant_image: product.variant_image,
+            variant_price: product.price,
+            variant_stock: product.stock,
+          }
+        : null);
+
+    const wishlistItem = {
+      id: product.id,
+      name: product.name,
+      category_name: product.category_name || product.category,
+
+      image:
+        defaultVariant?.variant_image || product.image || product.image_url,
+      price: defaultVariant?.variant_price ?? product.price,
+      stock: defaultVariant?.variant_stock ?? product.stock,
+
+      variant_id: defaultVariant?.id || null,
+      selectedColor: defaultVariant?.color || null,
+      selectedSize: null,
+
+      has_variants: Boolean(product.has_variants || product.variants?.length),
+    };
+
+    const targetKey = getWishlistItemKey(wishlistItem);
+    const isExist = savedWishlist.some(
+      (item) => getWishlistItemKey(item) === targetKey,
+    );
 
     let updatedWishlist;
     if (isExist) {
-      updatedWishlist = savedWishlist.filter((item) => item.id !== product.id);
+      updatedWishlist = savedWishlist.filter(
+        (item) => getWishlistItemKey(item) !== targetKey,
+      );
     } else {
-      const defaultVariant =
-        product.variants?.find((v) => v.is_default) ||
-        product.variants?.[0] ||
-        (product.variant_id ||
-        product.variant_color ||
-        product.variant_size ||
-        product.variant_image
-          ? {
-              id: product.variant_id,
-              color: product.variant_color,
-              size: product.variant_size,
-              variant_image: product.variant_image,
-              variant_price: product.price,
-              variant_stock: product.stock,
-            }
-          : null);
-
-      const wishlistItem = {
-        id: product.id,
-        name: product.name,
-        category_name: product.category_name || product.category,
-
-        image:
-          defaultVariant?.variant_image || product.image || product.image_url,
-        price: defaultVariant?.variant_price ?? product.price,
-        stock: defaultVariant?.variant_stock ?? product.stock,
-
-        variant_id: defaultVariant?.id || null,
-        selectedColor: defaultVariant?.color || null,
-        selectedSize: null,
-
-        has_variants: Boolean(product.has_variants || product.variants?.length),
-      };
-
       updatedWishlist = [...savedWishlist, wishlistItem];
     }
 
