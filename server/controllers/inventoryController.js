@@ -5,7 +5,9 @@ const pool = require("../db");
 
 const normalizeCategoryName = (value = "") => value.trim().replace(/\s+/g, " ");
 const normalizeAttributeName = (value = "") =>
-  String(value || "").trim().toLowerCase();
+  String(value || "")
+    .trim()
+    .toLowerCase();
 
 const parseVariantGroups = (variantGroups = []) => {
   if (!Array.isArray(variantGroups)) {
@@ -63,19 +65,23 @@ const sanitizeVariant = (variant = {}, index = 0) => {
     : [];
 
   const findAttributeValue = (nameMatcher) =>
-    normalizedAttributes.find((item) => nameMatcher(item.attributeName || ""))?.value;
+    normalizedAttributes.find((item) => nameMatcher(item.attributeName || ""))
+      ?.value;
 
-  const inferredColor =
-    variant.color?.trim() ||
-    findAttributeValue((name) => normalizeAttributeName(name) === "color") ||
-    findAttributeValue((name) => normalizeAttributeName(name) === "colour") ||
-    null;
+  const isColorAttribute = (name) => {
+    const normalized = normalizeAttributeName(name);
+    return (
+      normalized === "color" ||
+      normalized === "colour" ||
+      normalized.includes("color") ||
+      normalized.includes("colour")
+    );
+  };
 
-  const inferredSize =
-    variant.size?.trim() ||
-    findAttributeValue((name) => normalizeAttributeName(name) === "size") ||
-    findAttributeValue((name) => normalizeAttributeName(name) === "storage") ||
-    null;
+  const isSizeAttribute = (name) => {
+    const normalized = normalizeAttributeName(name);
+    return normalized === "size" || normalized.includes("size");
+  };
 
   const normalizedLabel =
     variant.label?.trim() ||
@@ -84,16 +90,55 @@ const sanitizeVariant = (variant = {}, index = 0) => {
       .map((item) => `${item.attributeName || "Attribute"}: ${item.value}`)
       .join(" | ") ||
     null;
+
+  const extractLabelValue = (label, matcher) => {
+    if (!label) return null;
+    const parts = String(label)
+      .split("|")
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    for (const part of parts) {
+      if (!matcher(part)) continue;
+      const segments = part.split(":");
+      const value = segments.slice(1).join(":").trim();
+      if (value) return value;
+      const words = part.trim().split(/\s+/);
+      if (words.length > 1) return words[words.length - 1];
+    }
+
+    return null;
+  };
+
+  const labelColor = extractLabelValue(normalizedLabel, (part) =>
+    /color|colour/i.test(part),
+  );
+  const labelSize = extractLabelValue(normalizedLabel, (part) =>
+    /size/i.test(part),
+  );
+
+  const inferredColor =
+    variant.color?.trim() ||
+    findAttributeValue(isColorAttribute) ||
+    labelColor ||
+    null;
+
+  const inferredSize =
+    variant.size?.trim() ||
+    findAttributeValue(isSizeAttribute) ||
+    labelSize ||
+    findAttributeValue((name) => normalizeAttributeName(name) === "storage") ||
+    null;
   const normalizedImages = Array.isArray(variant.variant_images)
     ? variant.variant_images
     : Array.isArray(variant.images)
       ? variant.images
-      : [
-          variant.variant_image?.trim() || variant.image?.trim() || null,
-        ];
+      : [variant.variant_image?.trim() || variant.image?.trim() || null];
   const cleanedImages = [
     ...new Set(
-      normalizedImages.map((value) => String(value || "").trim()).filter(Boolean),
+      normalizedImages
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
     ),
   ];
 
@@ -113,7 +158,8 @@ const sanitizeVariant = (variant = {}, index = 0) => {
     size: inferredSize,
     color: inferredColor,
     sku: variant.sku?.trim() || null,
-    variant_price: Number.parseFloat(variant.variant_price ?? variant.price) || 0,
+    variant_price:
+      Number.parseFloat(variant.variant_price ?? variant.price) || 0,
     variant_sale_price,
     variant_stock:
       Number.parseInt(variant.variant_stock ?? variant.stock, 10) || 0,
@@ -121,7 +167,9 @@ const sanitizeVariant = (variant = {}, index = 0) => {
     variant_images: cleanedImages,
     images: cleanedImages,
     is_default:
-      typeof variant.is_default === "boolean" ? variant.is_default : index === 0,
+      typeof variant.is_default === "boolean"
+        ? variant.is_default
+        : index === 0,
     variant_attributes: normalizedAttributes,
   };
 };
@@ -240,9 +288,8 @@ const validateVariantDefinitions = (
   variationAttributeIds = [],
   mappedAttributes = [],
 ) => {
-  const selectedVariationIds = (Array.isArray(variationAttributeIds)
-    ? variationAttributeIds
-    : []
+  const selectedVariationIds = (
+    Array.isArray(variationAttributeIds) ? variationAttributeIds : []
   )
     .map((id) => Number.parseInt(id, 10))
     .filter((id) => Number.isInteger(id) && id > 0);
@@ -253,7 +300,8 @@ const validateVariantDefinitions = (
   for (const attributeId of selectedVariationIds) {
     if (!mappedAttributeMap.has(attributeId)) {
       return {
-        error: "One or more selected variation attributes are not mapped to the category.",
+        error:
+          "One or more selected variation attributes are not mapped to the category.",
       };
     }
   }
@@ -272,7 +320,10 @@ const validateVariantDefinitions = (
       };
     }
 
-    if (!Number.isFinite(Number(variant.variant_price)) || Number(variant.variant_price) < 0) {
+    if (
+      !Number.isFinite(Number(variant.variant_price)) ||
+      Number(variant.variant_price) < 0
+    ) {
       return {
         error: `${label} has an invalid price.`,
       };
@@ -284,7 +335,8 @@ const validateVariantDefinitions = (
       saleRaw !== "" &&
       saleRaw !== undefined &&
       saleRaw !== null &&
-      (!Number.isFinite(Number.parseFloat(saleRaw)) || Number.parseFloat(saleRaw) < 0)
+      (!Number.isFinite(Number.parseFloat(saleRaw)) ||
+        Number.parseFloat(saleRaw) < 0)
     ) {
       return {
         error: `${label} has an invalid sale price.`,
@@ -326,7 +378,9 @@ const validateVariantDefinitions = (
             })
             .join("|")
         : "default";
-    const skuKey = String(variant.sku || "").trim().toUpperCase();
+    const skuKey = String(variant.sku || "")
+      .trim()
+      .toUpperCase();
     const identity = `${combinationKey}||${skuKey}`;
 
     if (duplicateIdentitySet.has(identity)) {
@@ -433,7 +487,10 @@ const handleCreateItem = async (req, res) => {
         .filter((id) => Number.isInteger(id) && id > 0),
     );
     const mappedAttributeNameById = new Map(
-      mappedAttributes.map((attribute) => [Number(attribute.id), attribute.name]),
+      mappedAttributes.map((attribute) => [
+        Number(attribute.id),
+        attribute.name,
+      ]),
     );
     const normalizedVariants =
       parsedVariantGroups.length > 0
@@ -547,7 +604,9 @@ const handleUpdateItem = async (req, res) => {
     attributes = [],
     variationAttributeIds = [],
   } = req.body;
+  const normalizedName = name?.trim();
   const normalizedCategoryName = normalizeCategoryName(category);
+  const normalizedCategoryId = Number.parseInt(categoryId, 10);
   const parsedVariantGroups = parseVariantGroups(variantGroups);
   const variantList = Array.isArray(variants) ? variants : [];
   const normalizedProductAttributes = normalizeSpecifications(
@@ -555,17 +614,27 @@ const handleUpdateItem = async (req, res) => {
       ? specifications
       : attributes,
   );
+
+  if (!normalizedName) {
+    return res.status(400).json({ message: "Product name is required" });
+  }
+
+  if (
+    !normalizedCategoryName &&
+    !(Number.isInteger(normalizedCategoryId) && normalizedCategoryId > 0)
+  ) {
+    return res.status(400).json({ message: "Category is required" });
+  }
   const client = await pool.connect();
 
   try {
     await client.query("BEGIN");
-
-    const normalizedCategoryId = Number.parseInt(categoryId, 10);
-    const categoryRecord = Number.isInteger(normalizedCategoryId) && normalizedCategoryId > 0
-      ? await Category.findById(normalizedCategoryId, client)
-      : normalizedCategoryName
-        ? await Category.findOrCreateByName(normalizedCategoryName, client)
-        : null;
+    const categoryRecord =
+      Number.isInteger(normalizedCategoryId) && normalizedCategoryId > 0
+        ? await Category.findById(normalizedCategoryId, client)
+        : normalizedCategoryName
+          ? await Category.findOrCreateByName(normalizedCategoryName, client)
+          : null;
 
     if (
       Number.isInteger(normalizedCategoryId) &&
@@ -585,7 +654,10 @@ const handleUpdateItem = async (req, res) => {
         .filter((id) => Number.isInteger(id) && id > 0),
     );
     const mappedAttributeNameById = new Map(
-      mappedAttributes.map((attribute) => [Number(attribute.id), attribute.name]),
+      mappedAttributes.map((attribute) => [
+        Number(attribute.id),
+        attribute.name,
+      ]),
     );
     const normalizedVariants =
       parsedVariantGroups.length > 0
@@ -609,11 +681,13 @@ const handleUpdateItem = async (req, res) => {
                 index,
               ),
             )
-        : [];
+          : [];
 
     if (normalizedVariants.length === 0) {
       await client.query("ROLLBACK");
-      return res.status(400).json({ message: "At least one variant is required." });
+      return res
+        .status(400)
+        .json({ message: "At least one variant is required." });
     }
     const attributeValidation = validateProductAttributes(
       mappedAttributes,
@@ -637,8 +711,38 @@ const handleUpdateItem = async (req, res) => {
       return res.status(400).json({ message: variantValidation.error });
     }
 
+    const existingVariantIds = await inventoryModel.getVariantIdsByProductId(
+      client,
+      id,
+    );
+    const existingVariantIdSet = new Set(existingVariantIds);
+    const incomingWithId = normalizedVariants.filter((variant) =>
+      Number.isInteger(Number(variant.id)),
+    );
+    const incomingExistingIds = incomingWithId
+      .map((variant) => Number(variant.id))
+      .filter((variantId) => existingVariantIdSet.has(variantId));
+    const incomingNewVariants = normalizedVariants.filter((variant) => {
+      const parsedId = Number(variant.id);
+      return !Number.isInteger(parsedId) || !existingVariantIdSet.has(parsedId);
+    });
+    const idsToDelete = existingVariantIds.filter(
+      (variantId) => !incomingExistingIds.includes(variantId),
+    );
+    const referencedIds = await inventoryModel.getReferencedVariantIds(
+      client,
+      idsToDelete,
+    );
+    const safeDeleteIds = idsToDelete.filter(
+      (variantId) => !referencedIds.has(variantId),
+    );
+    const finalVariantCount =
+      existingVariantIds.length -
+      safeDeleteIds.length +
+      incomingNewVariants.length;
+
     await inventoryModel.updateItem(client, id, {
-      name: name?.trim(),
+      name: normalizedName,
       category: categoryRecord?.name || normalizedCategoryName || null,
       categoryId: categoryRecord?.id || null,
       description: description?.trim() || null,
@@ -648,13 +752,21 @@ const handleUpdateItem = async (req, res) => {
         normalizedVariants.find((variant) => variant.variant_image)
           ?.variant_image ||
         null,
-      hasVariants: normalizedVariants.length > 1,
+      hasVariants: finalVariantCount > 1,
     });
 
-    await inventoryModel.deleteVariantsByProductId(client, id);
+    await inventoryModel.deleteVariantsByIds(client, safeDeleteIds);
 
     for (const [index, variant] of normalizedVariants.entries()) {
-      await inventoryModel.createVariant(client, id, variant, index === 0);
+      const variantId = Number(variant.id);
+      if (Number.isInteger(variantId) && existingVariantIdSet.has(variantId)) {
+        await inventoryModel.updateVariant(client, variantId, {
+          ...variant,
+          is_default: index === 0,
+        });
+      } else {
+        await inventoryModel.createVariant(client, id, variant, index === 0);
+      }
     }
 
     await inventoryModel.replaceProductAttributes(

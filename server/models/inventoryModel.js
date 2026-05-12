@@ -165,7 +165,7 @@ const mapVariantValues = (variant = {}) => {
         : null;
 
   return {
-    size: variant.size || variant.label || null,
+    size: variant.size || null,
     color: variant.color || null,
     variant_price:
       Number.parseFloat(variant.variant_price ?? variant.price) || 0,
@@ -522,6 +522,48 @@ const deleteVariant = async (variantId, userId) => {
   return pool.query("DELETE FROM product_variants WHERE id = $1", [variantId]);
 };
 
+const getVariantIdsByProductId = async (client, productId) => {
+  const result = await client.query(
+    "SELECT id FROM product_variants WHERE product_id = $1",
+    [productId],
+  );
+  return result.rows
+    .map((row) => Number.parseInt(row.id, 10))
+    .filter((id) => Number.isInteger(id) && id > 0);
+};
+
+const getReferencedVariantIds = async (client, variantIds = []) => {
+  if (!Array.isArray(variantIds) || variantIds.length === 0) {
+    return new Set();
+  }
+
+  const hasOrderItemsTable = await tableExists(client, "order_items");
+  if (!hasOrderItemsTable) {
+    return new Set();
+  }
+
+  const result = await client.query(
+    "SELECT DISTINCT variant_id FROM order_items WHERE variant_id = ANY($1::int[])",
+    [variantIds],
+  );
+
+  return new Set(
+    result.rows
+      .map((row) => Number.parseInt(row.variant_id, 10))
+      .filter((id) => Number.isInteger(id) && id > 0),
+  );
+};
+
+const deleteVariantsByIds = async (client, variantIds = []) => {
+  if (!Array.isArray(variantIds) || variantIds.length === 0) {
+    return;
+  }
+
+  await client.query("DELETE FROM product_variants WHERE id = ANY($1::int[])", [
+    variantIds,
+  ]);
+};
+
 const deleteVariantsByProductId = async (client, productId) => {
   return client.query("DELETE FROM product_variants WHERE product_id = $1", [
     productId,
@@ -591,6 +633,9 @@ module.exports = {
   updateVariant,
   deleteItem,
   deleteVariant,
+  getVariantIdsByProductId,
+  getReferencedVariantIds,
+  deleteVariantsByIds,
   deleteVariantsByProductId,
   replaceProductAttributes,
 };
