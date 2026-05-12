@@ -25,15 +25,18 @@ import {
   saveCart,
   saveWishlist,
 } from "@/app/utils/browserStorage";
-import ImageGallery from "@/app/(shop)/products/[id]/components/ImageGallery";
-import VariantPicker from "@/app/(shop)/products/[id]/components/VariantPicker";
-import SpecificationTable from "@/app/(shop)/products/[id]/components/SpecificationTable";
+import ImageGallery from "@/components/shop/ImageGallery";
+import VariantPicker from "@/components/shop/VariantPicker";
+import SpecificationTable from "@/components/shop/SpecificationTable";
 import { normalizeVariant } from "@/app/(shop)/products/[id]/utils";
 
 const getFallbackImage = () =>
   "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?q=80&w=600";
 
-const buildVariationAttributes = (variants = [], attributeDefinitionMap = new Map()) => {
+const buildVariationAttributes = (
+  variants = [],
+  attributeDefinitionMap = new Map(),
+) => {
   const optionsById = new Map();
 
   variants.forEach((variant) => {
@@ -63,7 +66,11 @@ const buildVariationAttributes = (variants = [], attributeDefinitionMap = new Ma
     .sort((a, b) => a.attributeId - b.attributeId);
 };
 
-const findMatchingVariant = (variants, selectedOptions, variationAttributes) => {
+const findMatchingVariant = (
+  variants,
+  selectedOptions,
+  variationAttributes,
+) => {
   if (!Array.isArray(variants) || variants.length === 0) return null;
   if (!Array.isArray(variationAttributes) || variationAttributes.length === 0) {
     return variants.find((variant) => variant.is_default) || variants[0];
@@ -129,7 +136,9 @@ export default function ProductDetailsPage() {
 
         const wishlistItems = loadWishlist();
         setIsWishlisted(
-          wishlistItems.some((item) => String(item.id) === String(nextProduct?.id)),
+          wishlistItems.some(
+            (item) => String(item.id) === String(nextProduct?.id),
+          ),
         );
       } catch (error) {
         if (!active) return;
@@ -149,7 +158,9 @@ export default function ProductDetailsPage() {
 
   const normalizedVariants = useMemo(() => {
     if (!Array.isArray(product?.variants)) return [];
-    return product.variants.map((variant, index) => normalizeVariant(variant, index));
+    return product.variants.map((variant, index) =>
+      normalizeVariant(variant, index),
+    );
   }, [product?.variants]);
 
   const attributeDefinitionMap = useMemo(
@@ -168,6 +179,49 @@ export default function ProductDetailsPage() {
     [attributeDefinitionMap, normalizedVariants],
   );
 
+  const optionAvailability = useMemo(() => {
+    const availability = {};
+    variationAttributes.forEach((attribute) => {
+      const optionMap = {};
+      attribute.options.forEach((option) => {
+        optionMap[option] = false;
+      });
+      availability[attribute.attributeId] = optionMap;
+    });
+
+    normalizedVariants.forEach((variant) => {
+      if (Number(variant.stock) <= 0) return;
+      const attributeMap = new Map(
+        (variant.variant_attributes || []).map((entry) => [
+          Number(entry.attributeId ?? entry.attribute_id),
+          String(entry.value || "").trim(),
+        ]),
+      );
+
+      variationAttributes.forEach((attribute) => {
+        const optionValue = attributeMap.get(attribute.attributeId);
+        if (!optionValue) return;
+
+        const matchesSelection = variationAttributes.every((other) => {
+          if (other.attributeId === attribute.attributeId) return true;
+          const selectedValue = selectedOptions[other.attributeId];
+          if (!selectedValue) return true;
+          return attributeMap.get(other.attributeId) === selectedValue;
+        });
+
+        if (matchesSelection && availability[attribute.attributeId]) {
+          availability[attribute.attributeId][optionValue] = true;
+        }
+      });
+    });
+
+    return availability;
+  }, [normalizedVariants, selectedOptions, variationAttributes]);
+
+  const isSizeAttribute = (name = "") => /size/i.test(String(name || ""));
+  const isColorAttribute = (name = "") =>
+    /color|colour/i.test(String(name || ""));
+
   useEffect(() => {
     if (!product) return;
 
@@ -177,12 +231,16 @@ export default function ProductDetailsPage() {
     }
 
     const defaultVariant =
-      normalizedVariants.find((variant) => variant.is_default) || normalizedVariants[0];
+      normalizedVariants.find((variant) => variant.is_default) ||
+      normalizedVariants[0];
 
     const nextOptions = {};
     variationAttributes.forEach((attribute) => {
+      if (!isColorAttribute(attribute.name)) return;
       const matched = (defaultVariant?.variant_attributes || []).find(
-        (entry) => Number(entry.attributeId ?? entry.attribute_id) === attribute.attributeId,
+        (entry) =>
+          Number(entry.attributeId ?? entry.attribute_id) ===
+          attribute.attributeId,
       );
       if (matched?.value) {
         nextOptions[attribute.attributeId] = String(matched.value);
@@ -193,7 +251,12 @@ export default function ProductDetailsPage() {
   }, [product, normalizedVariants, variationAttributes]);
 
   const activeVariant = useMemo(
-    () => findMatchingVariant(normalizedVariants, selectedOptions, variationAttributes),
+    () =>
+      findMatchingVariant(
+        normalizedVariants,
+        selectedOptions,
+        variationAttributes,
+      ),
     [normalizedVariants, selectedOptions, variationAttributes],
   );
 
@@ -218,7 +281,12 @@ export default function ProductDetailsPage() {
 
     const merged = [...new Set([...variantImages, ...fallbackList])];
     return merged.length > 0 ? merged : [getFallbackImage()];
-  }, [activeVariant?.images, activeVariant?.variant_image, product?.image, product?.image_url]);
+  }, [
+    activeVariant?.images,
+    activeVariant?.variant_image,
+    product?.image,
+    product?.image_url,
+  ]);
 
   useEffect(() => {
     setActiveImageIndex(0);
@@ -246,10 +314,13 @@ export default function ProductDetailsPage() {
     const specifications = Array.isArray(product?.specifications)
       ? product.specifications
       : [];
-    const variationIdSet = new Set(variationAttributes.map((entry) => entry.attributeId));
+    const variationIdSet = new Set(
+      variationAttributes.map((entry) => entry.attributeId),
+    );
 
     return specifications.filter(
-      (entry) => !variationIdSet.has(Number(entry.attributeId ?? entry.attribute_id)),
+      (entry) =>
+        !variationIdSet.has(Number(entry.attributeId ?? entry.attribute_id)),
     );
   }, [product?.specifications, variationAttributes]);
 
@@ -286,8 +357,9 @@ export default function ProductDetailsPage() {
         ] || null,
       selectedSize:
         selectedOptions[
-          variationAttributes.find((attribute) => attribute.name.toLowerCase() === "size")
-            ?.attributeId
+          variationAttributes.find((attribute) =>
+            isSizeAttribute(attribute.name),
+          )?.attributeId
         ] || null,
       price: displayPrice,
       quantity: selectedQuantity,
@@ -323,6 +395,22 @@ export default function ProductDetailsPage() {
     if (!product) return;
 
     const baseWishlist = loadWishlist();
+    const selectedAttributes = variationAttributes
+      .map((attribute) => {
+        const value = selectedOptions[attribute.attributeId];
+        if (!value) return null;
+        return {
+          attributeId: attribute.attributeId,
+          name: attribute.name || `Attribute ${attribute.attributeId}`,
+          value: String(value).trim(),
+        };
+      })
+      .filter(Boolean);
+    const variationAttributeCount = variationAttributes.length;
+    const selectedAttributeCount = selectedAttributes.length;
+    const isSelectionComplete =
+      variationAttributeCount === 0 ||
+      selectedAttributeCount >= variationAttributeCount;
     const wishlistEntry = {
       id: product.id,
       name: product.name,
@@ -330,7 +418,7 @@ export default function ProductDetailsPage() {
       image: galleryImages[0],
       price: displayPrice,
       stock: displayStock,
-      variant_id: activeVariant?.id || null,
+      variant_id: isSelectionComplete ? activeVariant?.id || null : null,
       selectedColor:
         selectedOptions[
           variationAttributes.find((attribute) =>
@@ -339,14 +427,19 @@ export default function ProductDetailsPage() {
         ] || null,
       selectedSize:
         selectedOptions[
-          variationAttributes.find((attribute) => attribute.name.toLowerCase() === "size")
-            ?.attributeId
+          variationAttributes.find((attribute) =>
+            isSizeAttribute(attribute.name),
+          )?.attributeId
         ] || null,
       has_variants: variationAttributes.length > 0,
       variant_price: displayPrice,
       variant_stock: displayStock,
       variant_image: galleryImages[0],
       variants: normalizedVariants,
+      selectedAttributes,
+      selectedAttributeCount,
+      variationAttributeCount,
+      isSelectionComplete,
     };
 
     const targetKey = getWishlistItemKey(wishlistEntry);
@@ -384,7 +477,8 @@ export default function ProductDetailsPage() {
     );
   }
 
-  const displayImage = galleryImages[Math.min(activeImageIndex, galleryImages.length - 1)];
+  const displayImage =
+    galleryImages[Math.min(activeImageIndex, galleryImages.length - 1)];
 
   return (
     <div className="mx-auto max-w-6xl bg-white px-4 py-8 md:px-8 md:py-12">
@@ -448,6 +542,7 @@ export default function ProductDetailsPage() {
               selectedQuantity={selectedQuantity}
               onQuantityChange={setSelectedQuantity}
               displayStock={displayStock}
+              optionAvailability={optionAvailability}
             />
           </div>
 
@@ -480,11 +575,14 @@ export default function ProductDetailsPage() {
 
             <button
               onClick={handleToggleWishlist}
-              className={`flex flex-1 items-center justify-center gap-2.5 rounded-xl border border-slate-200 py-4 text-[11px] font-black uppercase tracking-widest transition-all active:scale-95 ${
-                isWishlisted ? "bg-red-50 text-red-500" : "bg-white text-slate-700"
+              className={`flex flex-1 hover:bg-red-50 items-center justify-center gap-2.5 rounded-xl border border-slate-200 py-4 text-[11px] font-black uppercase tracking-widest transition-all active:scale-95 ${
+                isWishlisted
+                  ? "bg-red-50 text-red-500"
+                  : "bg-white text-slate-700"
               }`}
             >
-              <Heart size={16} className={isWishlisted ? "fill-red-500" : ""} /> Wishlist
+              <Heart size={16} className={isWishlisted ? "fill-red-500" : ""} />
+              Wishlist
             </button>
           </div>
 

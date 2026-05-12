@@ -1,24 +1,23 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import WishlistHeader from "@/components/wishlist/WishlistHeader";
 import WishlistItemCard from "@/components/wishlist/WishlistItemCard";
 import WishlistEmptyState from "@/components/wishlist/WishlistEmptyState";
+import { useCart } from "@/context/CartContext";
 import {
   dispatchCartSync,
   getCartItemKey,
   getWishlistItemKey,
   loadCart,
-  loadWishlist,
   saveCart,
   saveWishlist,
 } from "@/app/utils/browserStorage";
 
 export default function WishlistPage() {
   const router = useRouter();
-  const [wishlistItems, setWishlistItems] = useState(() => loadWishlist());
+  const { wishlistItems } = useCart();
 
   const persistWishlist = (nextItems) => {
     const result = saveWishlist(nextItems);
@@ -27,7 +26,6 @@ export default function WishlistPage() {
       return false;
     }
 
-    setWishlistItems(result.items);
     dispatchCartSync();
     return true;
   };
@@ -40,9 +38,17 @@ export default function WishlistPage() {
   };
 
   const moveToCart = (item) => {
-    const needsSizeSelection = Boolean(item.has_variants && !item.selectedSize);
-    if (needsSizeSelection) {
-      toast("Please choose a size on the product page first.", { icon: "i" });
+    const variationCount = Number(item.variationAttributeCount ?? 0);
+    const selectedCount = Number(item.selectedAttributeCount ?? 0);
+    const isSelectionComplete =
+      item.isSelectionComplete === true ||
+      item.variant_id != null ||
+      (variationCount > 0 && selectedCount >= variationCount);
+    const needsSelection = Boolean(item.has_variants && !isSelectionComplete);
+    if (needsSelection) {
+      toast("Please choose product options on the product page first.", {
+        icon: "i",
+      });
       router.push(`/products/${item.id}`);
       return;
     }
@@ -70,7 +76,10 @@ export default function WishlistPage() {
 
     if (existingIndex > -1) {
       const nextQuantity = Number(nextCart[existingIndex].quantity || 1) + 1;
-      const stockLimit = Math.max(1, Number(nextCart[existingIndex].stock || 1));
+      const stockLimit = Math.max(
+        1,
+        Number(nextCart[existingIndex].stock || 1),
+      );
       nextCart[existingIndex] = {
         ...nextCart[existingIndex],
         quantity: Math.min(nextQuantity, stockLimit),
@@ -97,7 +106,6 @@ export default function WishlistPage() {
       return;
     }
 
-    setWishlistItems(wishlistResult.items);
     dispatchCartSync();
     toast.success("Moved to cart.");
   };
@@ -112,15 +120,24 @@ export default function WishlistPage() {
             {wishlistItems.map((item) => {
               const wishlistKey = getWishlistItemKey(item);
               const price = Number(item.variant_price ?? item.price ?? 0);
-              const isOutOfStock = Number(item.variant_stock ?? item.stock ?? 0) <= 0;
-              const needsSizeSelection = Boolean(item.has_variants && !item.selectedSize);
+              const isOutOfStock =
+                Number(item.variant_stock ?? item.stock ?? 0) <= 0;
+              const variationCount = Number(item.variationAttributeCount ?? 0);
+              const selectedCount = Number(item.selectedAttributeCount ?? 0);
+              const isSelectionComplete =
+                item.isSelectionComplete === true ||
+                item.variant_id != null ||
+                (variationCount > 0 && selectedCount >= variationCount);
+              const needsSelection = Boolean(
+                item.has_variants && !isSelectionComplete,
+              );
 
               return (
                 <WishlistItemCard
                   key={wishlistKey}
                   item={item}
                   price={price}
-                  needsSizeSelection={needsSizeSelection}
+                  needsSelection={needsSelection}
                   isOutOfStock={isOutOfStock}
                   onMoveToCart={() => moveToCart(item)}
                   onRemove={() => removeItem(wishlistKey)}
