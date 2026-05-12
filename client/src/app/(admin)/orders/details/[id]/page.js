@@ -13,9 +13,9 @@ import {
   User,
   Mail,
   MapPin,
-  Palette, 
-  Maximize2, 
-  Phone, 
+  Palette,
+  Maximize2,
+  Phone,
 } from "lucide-react";
 
 export default function OrderDetailsPage() {
@@ -73,6 +73,30 @@ export default function OrderDetailsPage() {
   };
 
   const ship = getParsedShipping();
+
+  const getItemAttributes = (item = {}) => {
+    const raw = Array.isArray(item.attributes)
+      ? item.attributes
+      : Array.isArray(item.specifications)
+        ? item.specifications
+        : [];
+
+    return raw
+      .map((entry) => ({
+        label: String(
+          entry.name ||
+            entry.attribute_name ||
+            entry.attributeName ||
+            entry.label ||
+            entry.key ||
+            "",
+        ).trim(),
+        value: String(
+          entry.value ?? entry.attribute_value ?? entry.attributeValue ?? "",
+        ).trim(),
+      }))
+      .filter((entry) => entry.label && entry.value);
+  };
 
   const handleStatusChange = async (newStatus) => {
     try {
@@ -134,54 +158,76 @@ export default function OrderDetailsPage() {
             </div>
 
             <div className="p-8 space-y-8">
-              {order.items?.map((item, index) => (
-                <div key={index} className="flex items-start gap-6 group">
-                  <div className="w-24 h-24 rounded-3xl bg-slate-50 border border-slate-100 overflow-hidden flex-shrink-0 relative group-hover:shadow-xl transition-all duration-500">
-                    <Image
-                      src={
-                        item.variant_image ||
-                        item.image ||
-                        "/api/placeholder/100/100"
-                      }
-                      alt={item.name}
-                      fill
-                      className="object-cover group-hover:scale-110 transition-transform duration-500"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-black text-slate-900 text-lg group-hover:text-blue-600 transition-colors uppercase tracking-tighter truncate">
-                      {item.name}
-                    </h3>
+              {order.items?.map((item, index) => {
+                const itemAttributes = getItemAttributes(item);
 
-                    <div className="flex flex-wrap gap-3 mt-2">
-                      {item.color && (
-                        <span className="flex items-center gap-1.5 text-[9px] font-black uppercase text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
-                          <Palette size={10} /> {item.color}
+                return (
+                  <div key={index} className="flex items-start gap-6 group">
+                    <div className="w-25 h-25 rounded-3xl bg-slate-50 border border-slate-100 overflow-hidden flex-shrink-0 relative group-hover:shadow-xl transition-all duration-500">
+                      <Image
+                        src={
+                          item.variant_image ||
+                          item.image ||
+                          "/api/placeholder/100/100"
+                        }
+                        alt={item.name}
+                        fill
+                        className="object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-black text-slate-900 text-lg group-hover:text-blue-600 transition-colors uppercase tracking-tighter truncate">
+                        {item.name}
+                      </h3>
+
+                      <div className="flex flex-wrap gap-3 mt-2">
+                        {item.color && (
+                          <span className="flex items-center gap-1.5 text-[9px] font-black uppercase text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                            <Palette size={10} /> {item.color}
+                          </span>
+                        )}
+                        {item.size && (
+                          <span className="flex items-center gap-1.5 text-[9px] font-black uppercase text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                            <Maximize2 size={10} /> Size: {item.size}
+                          </span>
+                        )}
+                        <span className="text-[9px] font-black uppercase text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
+                          Qty: {item.quantity}
                         </span>
+                      </div>
+
+                      {itemAttributes.length > 0 && (
+                        <div className="mt-8 shadow-sm hover:shadow-md rounded-2xl border border-slate-100 bg-white flex flex-col">
+                          {itemAttributes.map((attribute) => (
+                            <div
+                              key={`${attribute.label}-${attribute.value}`}
+                              className="flex items-center justify-between px-4 py-3 text-[10px] font-black uppercase tracking-widest"
+                            >
+                              <span className="text-slate-500">
+                                {attribute.label}
+                              </span>
+                              <span className="text-slate-900">
+                                {attribute.value}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       )}
-                      {item.size && (
-                        <span className="flex items-center gap-1.5 text-[9px] font-black uppercase text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
-                          <Maximize2 size={10} /> Size: {item.size}
-                        </span>
-                      )}
-                      <span className="text-[9px] font-black uppercase text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
-                        Qty: {item.quantity}
-                      </span>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-black text-slate-900 text-lg">
+                        ₹
+                        {(
+                          parseFloat(item.price) * item.quantity
+                        ).toLocaleString()}
+                      </p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                        ₹{parseFloat(item.price).toLocaleString()} / unit
+                      </p>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="font-black text-slate-900 text-lg">
-                      ₹
-                      {(
-                        parseFloat(item.price) * item.quantity
-                      ).toLocaleString()}
-                    </p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                      ₹{parseFloat(item.price).toLocaleString()} / unit
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="p-8 bg-slate-50/50 border-t border-slate-50">

@@ -127,6 +127,21 @@ const OrderModel = {
                 'variant_image', pv.variant_image,
                 'color', pv.color,
                 'size', pv.size,
+                'attributes', COALESCE(
+                  (
+                    SELECT json_agg(
+                      json_build_object(
+                        'name', a.name,
+                        'value', pav.attribute_value
+                      )
+                      ORDER BY a.id ASC
+                    )
+                    FROM product_attribute_values pav
+                    JOIN attributes a ON a.id = pav.attribute_id
+                    WHERE pav.product_id = oi.product_id
+                  ),
+                  '[]'::json
+                ),
                 'price', oi.price,
                 'quantity', oi.quantity
               )
@@ -177,6 +192,21 @@ const OrderModel = {
                 'variant_image', pv.variant_image,
                 'color', pv.color,
                 'size', pv.size,
+                'attributes', COALESCE(
+                  (
+                    SELECT json_agg(
+                      json_build_object(
+                        'name', a.name,
+                        'value', pav.attribute_value
+                      )
+                      ORDER BY a.id ASC
+                    )
+                    FROM product_attribute_values pav
+                    JOIN attributes a ON a.id = pav.attribute_id
+                    WHERE pav.product_id = oi.product_id
+                  ),
+                  '[]'::json
+                ),
                 'price', oi.price,
                 'quantity', oi.quantity
               )
@@ -219,6 +249,21 @@ const OrderModel = {
             'variant_image', pv.variant_image,
             'color', pv.color,
             'size', pv.size,
+            'attributes', COALESCE(
+              (
+                SELECT json_agg(
+                  json_build_object(
+                    'name', a.name,
+                    'value', pav.attribute_value
+                  )
+                  ORDER BY a.id ASC
+                )
+                FROM product_attribute_values pav
+                JOIN attributes a ON a.id = pav.attribute_id
+                WHERE pav.product_id = oi.product_id
+              ),
+              '[]'::json
+            ),
             'price', oi.price,
             'quantity', oi.quantity
           ))
