@@ -126,8 +126,13 @@ export default function EditInventoryModal({
   const [selectedVariationAttributeIds, setSelectedVariationAttributeIds] =
     useState([]);
   const [variants, setVariants] = useState([createEmptyVariant()]);
+  const [resolvedItem, setResolvedItem] = useState(null);
+  const [isFetchingItem, setIsFetchingItem] = useState(false);
 
   const hydratedItemRef = useRef(null);
+  const hydratedSourceRef = useRef("none");
+
+  const effectiveItem = resolvedItem || item;
 
   const categoryNameMap = useMemo(
     () =>
@@ -159,25 +164,74 @@ export default function EditInventoryModal({
   );
 
   useEffect(() => {
-    if (!isOpen || !item) return;
+    if (!isOpen || !item?.id) return;
 
-    if (hydratedItemRef.current === item.id && formData.name) return;
+    let active = true;
+    setIsFetchingItem(true);
+    setResolvedItem(null);
+
+    const fetchItem = async () => {
+      try {
+        const response = await api.get(`/inventory/${item.id}`);
+        const fullItem = response.data?.data || response.data || null;
+        if (!active) return;
+        setResolvedItem(fullItem || item);
+      } catch {
+        if (!active) return;
+        setResolvedItem(item);
+      } finally {
+        if (active) setIsFetchingItem(false);
+      }
+    };
+
+    fetchItem();
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen, item?.id]);
+
+  useEffect(() => {
+    if (!isOpen || !effectiveItem) return;
+    if (isFetchingItem && !resolvedItem) return;
+
+    const sourceTag = resolvedItem ? "full" : "partial";
 
     const categoryInput = String(
-      item.category_name || item.category?.name || item.category || "",
+      effectiveItem.category_name ||
+        effectiveItem.category?.name ||
+        effectiveItem.category ||
+        "",
     );
-    const categoryId = resolveCategoryId(item, categories);
+    const categoryId = resolveCategoryId(effectiveItem, categories);
 
-    const itemVariants = Array.isArray(item.variants)
-      ? item.variants.map((variant, index) =>
+    if (
+      hydratedItemRef.current === effectiveItem.id &&
+      hydratedSourceRef.current === sourceTag &&
+      formData.name
+    ) {
+      if (!formData.categoryId && categoryId) {
+        setFormData((current) => ({
+          ...current,
+          categoryId,
+          categoryInput,
+        }));
+      }
+      return;
+    }
+
+    const itemVariants = Array.isArray(effectiveItem.variants)
+      ? effectiveItem.variants.map((variant, index) =>
           normalizeVariantPayload(variant, index),
         )
       : [];
 
-    const variationFromPayload = Array.isArray(item.variationAttributeIds)
-      ? item.variationAttributeIds
-      : Array.isArray(item.variation_attribute_ids)
-        ? item.variation_attribute_ids
+    const variationFromPayload = Array.isArray(
+      effectiveItem.variationAttributeIds,
+    )
+      ? effectiveItem.variationAttributeIds
+      : Array.isArray(effectiveItem.variation_attribute_ids)
+        ? effectiveItem.variation_attribute_ids
         : [];
 
     const variationFromVariants = [
@@ -195,23 +249,35 @@ export default function EditInventoryModal({
         : variationFromVariants;
 
     setFormData({
-      name: String(item.name || ""),
+      name: String(effectiveItem.name || ""),
       categoryId,
       categoryInput,
-      description: String(item.description || ""),
+      description: String(effectiveItem.description || ""),
     });
-    setSpecValues(buildInitialSpecValues(item));
+    setSpecValues(buildInitialSpecValues(effectiveItem));
     setSelectedVariationAttributeIds(seedVariationIds.map((id) => Number(id)));
     setVariants(
       itemVariants.length > 0 ? itemVariants : [createEmptyVariant()],
     );
     setFormError("");
-    hydratedItemRef.current = item.id;
-  }, [categories, formData.name, isOpen, item]);
+    hydratedItemRef.current = effectiveItem.id;
+    hydratedSourceRef.current = sourceTag;
+  }, [
+    categories,
+    effectiveItem,
+    formData.categoryId,
+    formData.name,
+    isFetchingItem,
+    isOpen,
+    resolvedItem,
+  ]);
 
   useEffect(() => {
     if (!isOpen) {
       hydratedItemRef.current = null;
+      hydratedSourceRef.current = "none";
+      setResolvedItem(null);
+      setIsFetchingItem(false);
       return;
     }
 
@@ -556,7 +622,11 @@ export default function EditInventoryModal({
         ),
       };
 
-      const response = await api.put(`/inventory/${item.id}`, payload);
+      const targetId = effectiveItem?.id || item?.id;
+      if (!targetId) {
+        throw new Error("Missing item id for update.");
+      }
+      const response = await api.put(`/inventory/${targetId}`, payload);
       const updatedItem = response.data?.data || response.data || null;
 
       toast.dismiss(savingToastId);
@@ -584,40 +654,46 @@ export default function EditInventoryModal({
         <EditInventoryHeader onClose={onClose} />
 
         <div className="flex-1 space-y-8 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 md:p-10">
-          <form
-            id="luxury-edit-form"
-            onSubmit={handleSubmit}
-            className="space-y-8"
-          >
-            <EditInventoryBasicInfoSection
-              formData={formData}
-              categories={categories}
-              categoriesLoading={categoriesLoading}
-              onFieldChange={handleFieldChange}
-              onCategoryInputChange={handleCategoryInputChange}
-            />
+          {isFetchingItem && !resolvedItem ? (
+            <div className="flex min-h-[40vh] items-center justify-center text-sm font-semibold text-slate-500">
+              Loading product details...
+            </div>
+          ) : (
+            <form
+              id="luxury-edit-form"
+              onSubmit={handleSubmit}
+              className="space-y-8"
+            >
+              <EditInventoryBasicInfoSection
+                formData={formData}
+                categories={categories}
+                categoriesLoading={categoriesLoading}
+                onFieldChange={handleFieldChange}
+                onCategoryInputChange={handleCategoryInputChange}
+              />
 
-            <EditInventorySpecsSection
-              isLoadingSpecs={isLoadingSpecs}
-              categoryId={formData.categoryId}
-              mappedAttributes={mappedAttributes}
-              fixedSpecificationAttributes={fixedSpecificationAttributes}
-              specValues={specValues}
-              onSpecChange={handleSpecChange}
-            />
+              <EditInventorySpecsSection
+                isLoadingSpecs={isLoadingSpecs}
+                categoryId={formData.categoryId}
+                mappedAttributes={mappedAttributes}
+                fixedSpecificationAttributes={fixedSpecificationAttributes}
+                specValues={specValues}
+                onSpecChange={handleSpecChange}
+              />
 
-            <EditInventoryVariantMatrixSection
-              productName={formData.name}
-              selectableAttributes={selectableVariationAttributes}
-              selectedVariationAttributeIds={selectedVariationAttributeIds}
-              onToggleVariationAttribute={toggleVariationAttribute}
-              variants={variants}
-              setVariants={setVariants}
-              onAutoGenerateMatrix={handleAutoGenerateMatrix}
-            />
+              <EditInventoryVariantMatrixSection
+                productName={formData.name}
+                selectableAttributes={selectableVariationAttributes}
+                selectedVariationAttributeIds={selectedVariationAttributeIds}
+                onToggleVariationAttribute={toggleVariationAttribute}
+                variants={variants}
+                setVariants={setVariants}
+                onAutoGenerateMatrix={handleAutoGenerateMatrix}
+              />
 
-            <InventoryFormErrorAlert message={formError} />
-          </form>
+              <InventoryFormErrorAlert message={formError} />
+            </form>
+          )}
         </div>
 
         <EditInventoryFooterActions

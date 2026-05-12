@@ -1,6 +1,17 @@
 import { Loader2 } from "lucide-react";
 import ProductCard from "./ProductCard";
 
+const getDefaultVariantId = (product) => {
+  if (Array.isArray(product?.variants) && product.variants.length > 0) {
+    return (
+      product.variants.find((variant) => variant.is_default) ||
+      product.variants[0]
+    )?.id;
+  }
+
+  return product?.variant_id ?? null;
+};
+
 export default function ProductGrid({
   products,
   loading,
@@ -31,7 +42,16 @@ export default function ProductGrid({
               <ProductCard
                 key={product.id}
                 product={product}
-                isInWishlist={wishlist.some((item) => item.id === product.id)}
+                isInWishlist={wishlist.some((item) => {
+                  if (String(item.id) !== String(product.id)) return false;
+                  const defaultVariantId = getDefaultVariantId(product);
+                  if (defaultVariantId == null) {
+                    return item.variant_id == null;
+                  }
+                  return (
+                    String(item.variant_id ?? "") === String(defaultVariantId)
+                  );
+                })}
                 toggleWishlist={toggleWishlist}
               />
             ))

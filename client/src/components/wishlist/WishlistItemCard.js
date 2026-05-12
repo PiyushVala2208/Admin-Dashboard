@@ -5,15 +5,28 @@ import Link from "next/link";
 import Image from "next/image";
 import { ShoppingCart, Trash2 } from "lucide-react";
 
-// Props: { item, price, needsSizeSelection, isOutOfStock, onMoveToCart, onRemove }
 function WishlistItemCard({
   item,
   price,
-  needsSizeSelection,
+  needsSelection,
   isOutOfStock,
   onMoveToCart,
   onRemove,
 }) {
+  const selectedAttributes = Array.isArray(item.selectedAttributes)
+    ? item.selectedAttributes
+    : [];
+  const filteredAttributes = selectedAttributes.filter(
+    (attribute) => !/color|colour/i.test(attribute.name || ""),
+  );
+  const selectionText = filteredAttributes.length
+    ? filteredAttributes
+        .map((attribute) => `${attribute.name}: ${attribute.value}`)
+        .join(" | ")
+    : item.selectedSize
+      ? `Size: ${item.selectedSize}`
+      : null;
+
   return (
     <div className="bg-white rounded-4xl overflow-hidden border border-slate-200/60 shadow-sm hover:shadow-xl hover:shadow-purple-100/50 transition-all duration-500 group relative flex flex-col">
       <Link href={`/products/${item.id}`} className="cursor-pointer">
@@ -59,14 +72,14 @@ function WishlistItemCard({
             </h3>
           </Link>
 
-          {item.selectedSize ? (
+          {selectionText ? (
             <p className="text-[10px] font-bold text-purple-600 uppercase tracking-widest mb-1 flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-purple-600 rounded-full animate-pulse" />
-              MOving to Cart: {item.selectedSize}
+              Selected: {selectionText}
             </p>
           ) : (
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-              No size selected
+              Select options on product page
             </p>
           )}
 
@@ -79,11 +92,11 @@ function WishlistItemCard({
           <button
             onClick={onMoveToCart}
             disabled={isOutOfStock}
-            className="flex-[3] bg-slate-900 hover:bg-purple-600 disabled:bg-slate-100 disabled:text-slate-400 text-white py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-slate-200 hover:shadow-purple-200"
+            className="flex-3 bg-slate-900 hover:bg-purple-600 disabled:bg-slate-100 disabled:text-slate-400 text-white py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-slate-200 hover:shadow-purple-200"
           >
             <ShoppingCart size={16} />
-            {needsSizeSelection
-              ? "Select Size"
+            {needsSelection
+              ? "Select Options"
               : !isOutOfStock
                 ? "Move To Cart"
                 : "Out of Stock"}

@@ -4,6 +4,37 @@ import { memo } from "react";
 import Image from "next/image";
 import { IndianRupee, Layers, Loader2, Package, Trash2 } from "lucide-react";
 
+const extractSizeLabel = (variant) => {
+  if (!variant) return "";
+
+  const attributeSize = Array.isArray(variant.variant_attributes)
+    ? variant.variant_attributes.find((entry) =>
+        /size/i.test(String(entry.attributeName || entry.name || "")),
+      )?.value
+    : null;
+
+  if (attributeSize) {
+    return String(attributeSize).trim();
+  }
+
+  const raw = String(variant.size || variant.label || "").trim();
+  if (!raw) return "";
+
+  const pipeParts = raw
+    .split("|")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const lastPipe = pipeParts[pipeParts.length - 1] || raw;
+
+  const colonParts = lastPipe
+    .split(":")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const lastColon = colonParts[colonParts.length - 1] || lastPipe;
+
+  return lastColon || raw;
+};
+
 // Props: { item, displayImage, displaySKU, displayDescription, uniqueColors, selectedColor, availableSizes, selectedVariant, onColorChange, onSelectVariant, isDeletingVariant, onDeleteVariant, displayPrice, displayStock }
 function ProductSummaryCard({
   item,
@@ -104,11 +135,12 @@ function ProductSummaryCard({
                 <div className="flex flex-wrap gap-3">
                   {availableSizes.map((variant) => {
                     const isLow = variant.variant_stock <= 10;
+                    const sizeLabel = extractSizeLabel(variant) || "N/A";
                     return (
                       <button
                         key={variant.id}
                         onClick={() => onSelectVariant(variant)}
-                        className={`relative min-w-14 h-14 flex flex-col items-center justify-center rounded-xl text-sm font-bold transition-all border-2 ${
+                        className={`relative min-w-12 h-12 flex flex-col items-center justify-center rounded-xl text-sm font-bold transition-all border-2 ${
                           selectedVariant?.id === variant.id
                             ? "bg-slate-900 text-white border-slate-900 shadow-lg"
                             : isLow
@@ -116,7 +148,7 @@ function ProductSummaryCard({
                               : "bg-white text-slate-600 border-slate-100 hover:border-blue-400"
                         }`}
                       >
-                        <span>{variant.size}</span>
+                        <span>{sizeLabel}</span>
                         {isLow && (
                           <span
                             className={`text-[8px] absolute -bottom-2 px-1 rounded bg-red-600 text-white leading-tight ${
