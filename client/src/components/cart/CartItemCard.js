@@ -1,30 +1,22 @@
 "use client";
 
 import { memo } from "react";
-import { ChevronDown, Minus, Plus, Trash2 } from "lucide-react";
+import { Minus, Plus, Trash2 } from "lucide-react";
 
-function CartItemCard({
-  item,
-  itemKey,
-  variants,
-  onSizeChange,
-  onQuantityChange,
-  onRemove,
-}) {
-  const variantById = variants.find(
-    (variant) => variant.id === item.variant_id,
+function CartItemCard({ item, itemKey, onQuantityChange, onRemove }) {
+  const selectedAttributes = Array.isArray(item.selectedAttributes)
+    ? item.selectedAttributes
+    : [];
+  const filteredAttributes = selectedAttributes.filter(
+    (attribute) => !/color|colour/i.test(attribute.name || ""),
   );
-  const targetColor =
-    item.selectedColor?.toLowerCase().trim() ||
-    variantById?.color?.toLowerCase().trim();
-  const filteredVariants = variants.filter(
-    (variant) => variant.color?.toLowerCase().trim() === targetColor,
-  );
-  const sizeOptions = filteredVariants.length > 0 ? filteredVariants : variants;
-  const selectedSizeValue = item.selectedSize || "";
-  const hasSelectedSizeOption = sizeOptions.some(
-    (variant) => variant.size === selectedSizeValue,
-  );
+  const selectionText = filteredAttributes.length
+    ? filteredAttributes
+        .map((attribute) => `${attribute.name}: ${attribute.value}`)
+        .join(" | ")
+    : item.selectedSize
+      ? `Size: ${item.selectedSize}`
+      : "Default";
 
   return (
     <div className="bg-white p-4 md:p-6 rounded-4xl border border-slate-200/60 shadow-sm flex flex-col sm:flex-row items-center gap-6 group transition-all hover:border-purple-200">
@@ -43,55 +35,19 @@ function CartItemCard({
         <h3 className="font-extrabold text-purple-600 text-[22px] mb-1 tracking-wide">
           {item.name}
         </h3>
-        <p className="text-[12px] font-bold">
-          Color: <span className="text-slate-500">{item.selectedColor}</span>
-        </p>
+        <div className="space-y-1.5">
+          <p className="text-[12px] font-bold">
+            Color:{" "}
+            <span className="text-slate-500">
+              {item.selectedColor || "Default"}
+            </span>
+          </p>
+          <p className="text-[11px] font-bold text-slate-500">
+            {selectionText}
+          </p>
+        </div>
 
         <div className="flex items-center justify-center sm:justify-start gap-3 mt-3 mb-3">
-          <div className="relative group/select">
-            <select
-              value={selectedSizeValue}
-              onChange={(event) => {
-                if (!event.target.value) return;
-                onSizeChange(item, event.target.value);
-              }}
-              className="appearance-none bg-slate-50 border border-slate-100 text-slate-900 text-[11px] font-bold py-2.5 pl-3 pr-8 rounded-xl focus:outline-none focus:bg-white focus:border-purple-200 cursor-pointer uppercase transition-all"
-            >
-              {sizeOptions.length > 0 ? (
-                <>
-                  {!selectedSizeValue && (
-                    <option value="" disabled>
-                      Select size
-                    </option>
-                  )}
-                  {selectedSizeValue && !hasSelectedSizeOption && (
-                    <option value={selectedSizeValue}>
-                      Size: {selectedSizeValue}
-                    </option>
-                  )}
-                  {sizeOptions.map((variant) => (
-                    <option
-                      key={variant.id}
-                      value={variant.size}
-                      disabled={variant.variant_stock <= 0}
-                    >
-                      Size: {variant.size}{" "}
-                      {variant.variant_stock <= 0 ? "(OS)" : ""}
-                    </option>
-                  ))}
-                </>
-              ) : (
-                <option value="" disabled>
-                  Select size
-                </option>
-              )}
-            </select>
-            <ChevronDown
-              size={12}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-hover/select:text-purple-500"
-            />
-          </div>
-
           <div className="flex items-center bg-slate-50 rounded-xl p-1 border border-slate-100">
             <button
               onClick={() => onQuantityChange(itemKey, -1)}

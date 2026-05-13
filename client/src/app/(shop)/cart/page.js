@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ShoppingBag } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
@@ -18,7 +18,13 @@ import {
 
 export default function CartPage() {
   const router = useRouter();
-  const [cartItems, setCartItems] = useState(() => loadCart());
+  const [cartItems, setCartItems] = useState([]);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setCartItems(loadCart());
+    setIsHydrated(true);
+  }, []);
 
   const persistCart = (nextItems) => {
     const result = saveCart(nextItems);
@@ -55,51 +61,9 @@ export default function CartPage() {
   };
 
   const removeItem = (itemKey) => {
-    const nextCart = cartItems.filter((item) => getCartItemKey(item) !== itemKey);
-    persistCart(nextCart);
-  };
-
-  const handleSizeChange = (item, nextSize) => {
-    const variants = Array.isArray(item.variants) ? item.variants : [];
-    if (variants.length === 0) {
-      return;
-    }
-
-    const targetColor = String(item.selectedColor || "").trim().toLowerCase();
-    const matchedVariant =
-      variants.find(
-        (variant) =>
-          String(variant.size || "").trim() === nextSize &&
-          String(variant.color || "").trim().toLowerCase() === targetColor,
-      ) ||
-      variants.find((variant) => String(variant.size || "").trim() === nextSize);
-
-    if (!matchedVariant) {
-      toast.error("Selected size is not available.");
-      return;
-    }
-
-    const nextCart = cartItems.map((entry) => {
-      if (getCartItemKey(entry) !== getCartItemKey(item)) return entry;
-
-      const nextStock = Number(matchedVariant.variant_stock ?? matchedVariant.stock ?? 0);
-      const nextPrice = Number(matchedVariant.variant_price ?? matchedVariant.price ?? entry.price);
-      const nextImage =
-        matchedVariant.variant_image ||
-        (Array.isArray(matchedVariant.images) ? matchedVariant.images[0] : null) ||
-        entry.image;
-
-      return {
-        ...entry,
-        variant_id: matchedVariant.id || entry.variant_id,
-        selectedSize: nextSize,
-        price: nextPrice,
-        stock: nextStock,
-        image: nextImage,
-        quantity: Math.min(Number(entry.quantity || 1), Math.max(1, nextStock)),
-      };
-    });
-
+    const nextCart = cartItems.filter(
+      (item) => getCartItemKey(item) !== itemKey,
+    );
     persistCart(nextCart);
   };
 
@@ -116,7 +80,8 @@ export default function CartPage() {
   const subtotal = useMemo(
     () =>
       cartItems.reduce(
-        (total, item) => total + Number(item.price || 0) * Number(item.quantity || 1),
+        (total, item) =>
+          total + Number(item.price || 0) * Number(item.quantity || 1),
         0,
       ),
     [cartItems],
@@ -136,7 +101,14 @@ export default function CartPage() {
           </h1>
         </div>
 
-        {cartItems.length > 0 ? (
+        {!isHydrated ? (
+          <div className="bg-white rounded-[3rem] p-16 text-center border border-dashed max-w-2xl mx-auto">
+            <div className="w-12 h-12 mx-auto mb-6 rounded-full bg-slate-100 animate-pulse" />
+            <p className="text-sm font-semibold text-slate-400">
+              Loading your bag...
+            </p>
+          </div>
+        ) : cartItems.length > 0 ? (
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
             <div className="space-y-4 lg:col-span-8">
               {cartItems.map((item) => {
@@ -146,8 +118,6 @@ export default function CartPage() {
                     key={itemKey}
                     item={item}
                     itemKey={itemKey}
-                    variants={Array.isArray(item.variants) ? item.variants : []}
-                    onSizeChange={handleSizeChange}
                     onQuantityChange={updateQuantity}
                     onRemove={removeItem}
                   />

@@ -10,7 +10,6 @@ import ProductHeader from "@/components/shop/ProductHeader";
 import ProductGrid from "@/components/shop/ProductGrid";
 import {
   dispatchCartSync,
-  getWishlistItemKey,
   loadWishlist,
   saveWishlist,
 } from "@/app/utils/browserStorage";
@@ -37,6 +36,61 @@ function ProductPageInner() {
     const savedWishlist = loadWishlist();
     setWishlist(savedWishlist);
   }, []);
+
+  const buildWishlistItem = (product) => {
+    const fallbackVariant =
+      product.variants?.find((variant) => variant.is_default) ||
+      product.variants?.[0] ||
+      (product.variant_id ||
+      product.variant_color ||
+      product.variant_size ||
+      product.variant_image
+        ? {
+            id: product.variant_id,
+            color: product.variant_color,
+            size: product.variant_size,
+            variant_image: product.variant_image,
+            variant_price: product.default_variant_price ?? product.price,
+            variant_stock: product.default_variant_stock ?? product.stock,
+          }
+        : null);
+
+    const hasVariants = Boolean(
+      product.has_variants || (product.variants?.length || 0) > 1,
+    );
+    const basePrice = Number(
+      fallbackVariant?.variant_price ?? product.price ?? 0,
+    );
+    const baseStock = Number(
+      fallbackVariant?.variant_stock ?? product.stock ?? 0,
+    );
+    const baseImage =
+      fallbackVariant?.variant_image || product.image || product.image_url;
+
+    return {
+      id: product.id,
+      name: product.name,
+      category_name: product.category_name || product.category,
+      image: baseImage,
+      price: basePrice,
+      stock: baseStock,
+      variant_id: hasVariants ? null : fallbackVariant?.id || null,
+      selectedColor: hasVariants
+        ? null
+        : fallbackVariant?.color || product.variant_color || null,
+      selectedSize: hasVariants
+        ? null
+        : fallbackVariant?.size || product.variant_size || null,
+      has_variants: hasVariants,
+      variant_price: basePrice,
+      variant_stock: baseStock,
+      variant_image: baseImage,
+      selectedAttributes: [],
+      selectedAttributeCount: 0,
+      variationAttributeCount: 0,
+      isSelectionComplete: !hasVariants,
+    };
+  };
 
   useEffect(() => {
     if (categoryFilter && categories.length > 0) {
@@ -136,49 +190,15 @@ function ProductPageInner() {
 
   const toggleWishlist = (product) => {
     const savedWishlist = loadWishlist();
-    const defaultVariant =
-      product.variants?.find((v) => v.is_default) ||
-      product.variants?.[0] ||
-      (product.variant_id ||
-      product.variant_color ||
-      product.variant_size ||
-      product.variant_image
-        ? {
-            id: product.variant_id,
-            color: product.variant_color,
-            size: product.variant_size,
-            variant_image: product.variant_image,
-            variant_price: product.price,
-            variant_stock: product.stock,
-          }
-        : null);
-
-    const wishlistItem = {
-      id: product.id,
-      name: product.name,
-      category_name: product.category_name || product.category,
-
-      image:
-        defaultVariant?.variant_image || product.image || product.image_url,
-      price: defaultVariant?.variant_price ?? product.price,
-      stock: defaultVariant?.variant_stock ?? product.stock,
-
-      variant_id: defaultVariant?.id || null,
-      selectedColor: defaultVariant?.color || null,
-      selectedSize: null,
-
-      has_variants: Boolean(product.has_variants || product.variants?.length),
-    };
-
-    const targetKey = getWishlistItemKey(wishlistItem);
-    const isExist = savedWishlist.some(
-      (item) => getWishlistItemKey(item) === targetKey,
+    const wishlistItem = buildWishlistItem(product);
+    const hasSameProduct = savedWishlist.some(
+      (item) => String(item.id) === String(product.id),
     );
 
     let updatedWishlist;
-    if (isExist) {
+    if (hasSameProduct) {
       updatedWishlist = savedWishlist.filter(
-        (item) => getWishlistItemKey(item) !== targetKey,
+        (item) => String(item.id) !== String(product.id),
       );
     } else {
       updatedWishlist = [...savedWishlist, wishlistItem];

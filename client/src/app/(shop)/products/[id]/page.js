@@ -304,6 +304,7 @@ export default function ProductDetailsPage() {
     setIsWishlisted(
       wishlistItems.some((item) => {
         if (String(item.id) !== String(product.id)) return false;
+        if (item.variant_id == null) return true;
         if (selectedVariantId == null) return true;
         return String(item.variant_id ?? "") === String(selectedVariantId);
       }),
@@ -339,6 +340,18 @@ export default function ProductDetailsPage() {
       variant_id: activeVariant?.id || null,
     });
 
+    const selectedAttributes = variationAttributes
+      .map((attribute) => {
+        const value = selectedOptions[attribute.attributeId];
+        if (!value) return null;
+        return {
+          attributeId: attribute.attributeId,
+          name: attribute.name || `Attribute ${attribute.attributeId}`,
+          value: String(value).trim(),
+        };
+      })
+      .filter(Boolean);
+
     const nextCart = [...loadCart()];
     const existingIndex = nextCart.findIndex(
       (item) => getCartItemKey(item) === itemKey,
@@ -368,6 +381,9 @@ export default function ProductDetailsPage() {
       variant_image: galleryImages[0],
       has_variants: variationAttributes.length > 0,
       variants: normalizedVariants,
+      selectedAttributes,
+      selectedAttributeCount: selectedAttributes.length,
+      variationAttributeCount: variationAttributes.length,
     };
 
     if (existingIndex > -1) {
@@ -449,7 +465,16 @@ export default function ProductDetailsPage() {
 
     const nextWishlist = alreadyExists
       ? baseWishlist.filter((entry) => getWishlistItemKey(entry) !== targetKey)
-      : [...baseWishlist, wishlistEntry];
+      : [
+          ...baseWishlist.filter(
+            (entry) =>
+              !(
+                String(entry.id) === String(product.id) &&
+                entry.variant_id == null
+              ),
+          ),
+          wishlistEntry,
+        ];
 
     const result = saveWishlist(nextWishlist);
     if (!result.ok) {
@@ -458,7 +483,14 @@ export default function ProductDetailsPage() {
     }
 
     dispatchCartSync();
-    setIsWishlisted(!alreadyExists);
+    setIsWishlisted(
+      nextWishlist.some((entry) => {
+        if (String(entry.id) !== String(product.id)) return false;
+        if (entry.variant_id == null) return true;
+        if (activeVariant?.id == null) return true;
+        return String(entry.variant_id) === String(activeVariant.id);
+      }),
+    );
   };
 
   if (loading) {
@@ -586,6 +618,11 @@ export default function ProductDetailsPage() {
             </button>
           </div>
 
+          <SpecificationTable
+            technicalSpecs={technicalSpecs}
+            attributeDefinitionMap={attributeDefinitionMap}
+          />
+
           <div className="mb-8 grid grid-cols-3 gap-4 border-t border-slate-100 pt-6">
             <div className="flex flex-col items-center gap-2 text-center">
               <div className="rounded-xl bg-purple-50 p-2.5 text-purple-600">
@@ -612,11 +649,6 @@ export default function ProductDetailsPage() {
               </p>
             </div>
           </div>
-
-          <SpecificationTable
-            technicalSpecs={technicalSpecs}
-            attributeDefinitionMap={attributeDefinitionMap}
-          />
         </div>
       </div>
     </div>

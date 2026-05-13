@@ -1,11 +1,13 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { toast } from "react-hot-toast";
 import WishlistHeader from "@/components/wishlist/WishlistHeader";
 import WishlistItemCard from "@/components/wishlist/WishlistItemCard";
 import WishlistEmptyState from "@/components/wishlist/WishlistEmptyState";
+import WishlistSelectionModal from "@/components/wishlist/WishlistSelectionModal";
 import { useCart } from "@/context/CartContext";
+import api from "@/app/utils/api";
 import {
   dispatchCartSync,
   getCartItemKey,
@@ -16,8 +18,14 @@ import {
 } from "@/app/utils/browserStorage";
 
 export default function WishlistPage() {
-  const router = useRouter();
   const { wishlistItems } = useCart();
+  const [selectionState, setSelectionState] = useState({
+    isOpen: false,
+    loading: false,
+    item: null,
+    product: null,
+    wishlistKey: null,
+  });
 
   const persistWishlist = (nextItems) => {
     const result = saveWishlist(nextItems);
@@ -37,22 +45,71 @@ export default function WishlistPage() {
     persistWishlist(nextWishlist);
   };
 
-  const moveToCart = (item) => {
+  const openSelectionModal = async (item, wishlistKey) => {
+    if (!item) return;
+
+    setSelectionState({
+      isOpen: true,
+      loading: true,
+      item,
+      product: null,
+      wishlistKey,
+    });
+
+    try {
+      const response = await api.get(`/products/${item.id}`);
+      const product = response?.data?.data || response?.data || null;
+
+      setSelectionState((current) => {
+        if (!current.isOpen || current.item?.id !== item.id) {
+          return current;
+        }
+        return {
+          ...current,
+          loading: false,
+          product,
+        };
+      });
+    } catch (error) {
+      console.error("Wishlist selection load error:", error);
+      toast.error("Unable to load product options right now.");
+      setSelectionState({
+        isOpen: false,
+        loading: false,
+        item: null,
+        product: null,
+        wishlistKey: null,
+      });
+    }
+  };
+
+  const closeSelectionModal = () => {
+    setSelectionState({
+      isOpen: false,
+      loading: false,
+      item: null,
+      product: null,
+      wishlistKey: null,
+    });
+  };
+
+  const moveToCart = (item, wishlistKey) => {
     const variationCount = Number(item.variationAttributeCount ?? 0);
     const selectedCount = Number(item.selectedAttributeCount ?? 0);
     const isSelectionComplete =
-      item.isSelectionComplete === true ||
       item.variant_id != null ||
       (variationCount > 0 && selectedCount >= variationCount);
     const needsSelection = Boolean(item.has_variants && !isSelectionComplete);
     if (needsSelection) {
-      toast("Please choose product options on the product page first.", {
+      toast("Please select the remaining options to continue.", {
         icon: "i",
       });
-      router.push(`/products/${item.id}`);
       return;
     }
 
+    const selectedAttributes = Array.isArray(item.selectedAttributes)
+      ? item.selectedAttributes
+      : [];
     const nextCart = [...loadCart()];
     const cartItem = {
       id: item.id,
@@ -68,6 +125,11 @@ export default function WishlistPage() {
       variant_image: item.variant_image || item.image,
       has_variants: Boolean(item.has_variants),
       variants: Array.isArray(item.variants) ? item.variants : [],
+      selectedAttributes,
+      selectedAttributeCount: selectedAttributes.length,
+      variationAttributeCount: Number(
+        item.variationAttributeCount ?? selectedAttributes.length,
+      ),
     };
 
     const existingIndex = nextCart.findIndex(
@@ -94,9 +156,9 @@ export default function WishlistPage() {
       return;
     }
 
-    const wishlistKey = getWishlistItemKey(item);
+    const targetWishlistKey = wishlistKey || getWishlistItemKey(item);
     const nextWishlist = wishlistItems.filter(
-      (entry) => getWishlistItemKey(entry) !== wishlistKey,
+      (entry) => getWishlistItemKey(entry) !== targetWishlistKey,
     );
 
     const wishlistResult = saveWishlist(nextWishlist);
@@ -108,6 +170,71 @@ export default function WishlistPage() {
 
     dispatchCartSync();
     toast.success("Moved to cart.");
+  };
+
+  const handleSelectionConfirm = ({
+    selectedOptions,
+    selectedAttributes,
+    matchedVariant,
+    variationAttributes,
+  }) => {
+    const baseItem = selectionState.item;
+    if (!baseItem || !matchedVariant) return;
+
+    const matchedPrice = Number(
+      matchedVariant.price ??
+        matchedVariant.variant_price ??
+        baseItem.price ??
+        0,
+    );
+    const matchedStock = Number(
+      matchedVariant.stock ??
+        matchedVariant.variant_stock ??
+        baseItem.stock ??
+        0,
+    );
+    const matchedImage =
+      matchedVariant.variant_image ||
+      (Array.isArray(matchedVariant.images)
+        ? matchedVariant.images[0]
+        : null) ||
+      baseItem.variant_image ||
+      baseItem.image ||
+      null;
+
+    const colorAttribute = variationAttributes.find((attribute) =>
+      /color|colour/i.test(attribute.name || ""),
+    );
+    const sizeAttribute = variationAttributes.find((attribute) =>
+      /size/i.test(attribute.name || ""),
+    );
+
+    const selectedColor = colorAttribute
+      ? selectedOptions[colorAttribute.attributeId]
+      : baseItem.selectedColor;
+    const selectedSize = sizeAttribute
+      ? selectedOptions[sizeAttribute.attributeId]
+      : baseItem.selectedSize;
+
+    const updatedItem = {
+      ...baseItem,
+      variant_id: matchedVariant.id ?? baseItem.variant_id ?? null,
+      selectedColor: selectedColor || null,
+      selectedSize: selectedSize || null,
+      selectedAttributes,
+      selectedAttributeCount: selectedAttributes.length,
+      variationAttributeCount: variationAttributes.length,
+      isSelectionComplete: true,
+      variant_price: matchedPrice,
+      variant_stock: matchedStock,
+      variant_image: matchedImage,
+      price: matchedPrice,
+      stock: matchedStock,
+      image: matchedImage,
+    };
+
+    moveToCart(updatedItem, selectionState.wishlistKey);
+    closeSelectionModal();
   };
 
   return (
@@ -139,7 +266,11 @@ export default function WishlistPage() {
                   price={price}
                   needsSelection={needsSelection}
                   isOutOfStock={isOutOfStock}
-                  onMoveToCart={() => moveToCart(item)}
+                  onMoveToCart={() =>
+                    needsSelection
+                      ? openSelectionModal(item, wishlistKey)
+                      : moveToCart(item, wishlistKey)
+                  }
                   onRemove={() => removeItem(wishlistKey)}
                 />
               );
@@ -149,6 +280,15 @@ export default function WishlistPage() {
           <WishlistEmptyState />
         )}
       </div>
+
+      <WishlistSelectionModal
+        isOpen={selectionState.isOpen}
+        loading={selectionState.loading}
+        item={selectionState.item}
+        product={selectionState.product}
+        onClose={closeSelectionModal}
+        onConfirm={handleSelectionConfirm}
+      />
     </div>
   );
 }

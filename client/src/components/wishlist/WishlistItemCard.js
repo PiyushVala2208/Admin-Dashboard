@@ -79,7 +79,7 @@ function WishlistItemCard({
             </p>
           ) : (
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-              Select options on product page
+              Select options to move to cart
             </p>
           )}
 

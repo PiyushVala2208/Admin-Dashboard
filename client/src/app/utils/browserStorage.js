@@ -203,6 +203,27 @@ export const sanitizeCartItem = (item) => {
     return null;
   }
 
+  const normalizedAttributes = Array.isArray(item.selectedAttributes)
+    ? item.selectedAttributes
+        .map((entry) => {
+          if (!entry || typeof entry !== "object") return null;
+          const attributeId = Number(entry.attributeId ?? entry.attribute_id);
+          const name = cleanString(entry.name || entry.attribute_name);
+          const value = cleanString(entry.value || entry.attribute_value);
+          if (!value) return null;
+          return {
+            attributeId: Number.isInteger(attributeId) ? attributeId : null,
+            name:
+              name ||
+              (Number.isInteger(attributeId)
+                ? `Attribute ${attributeId}`
+                : "Attribute"),
+            value,
+          };
+        })
+        .filter(Boolean)
+    : [];
+
   return {
     id: item.id,
     name: cleanString(item.name) || "Product",
@@ -211,6 +232,8 @@ export const sanitizeCartItem = (item) => {
     variant_id: item.variant_id ?? null,
     selectedColor: cleanString(item.selectedColor),
     selectedSize: cleanString(item.selectedSize),
+    selectedAttributes: normalizedAttributes,
+    selectedAttributeCount: normalizedAttributes.length,
     price: toNumber(item.price),
     quantity: toPositiveInt(item.quantity, 1),
     stock: Math.max(0, toPositiveInt(item.stock, 0)),
@@ -401,10 +424,6 @@ const dedupeItemsByKey = (items, getKey) => {
     dedupedMap.set(getKey(item), item);
   });
 
-  // If no duplicates were removed, return the SAME original reference.
-  // This is critical for useSyncExternalStore — returning a new array
-  // reference on every call (even with identical content) causes React
-  // to see an infinite loop of "changed" snapshots.
   if (dedupedMap.size === items.length) {
     return items;
   }
