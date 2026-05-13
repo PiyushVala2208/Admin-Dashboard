@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { Boxes, Link2, ListChecks } from "lucide-react";
+import { Boxes, Link2, ListChecks, Search } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
 import api from "@/app/utils/api";
@@ -15,7 +15,9 @@ import {
 } from "@/components/Attributes/attributeUtils";
 
 const formatType = (value = "") => {
-  const normalized = String(value || "").trim().toLowerCase();
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
   if (!normalized) return "Unknown";
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 };
@@ -34,6 +36,7 @@ export default function AttributeList({
   const [editOptions, setEditOptions] = useState([]);
   const [editSnapshot, setEditSnapshot] = useState("");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isCheckingDependencies, setIsCheckingDependencies] = useState(false);
@@ -60,6 +63,19 @@ export default function AttributeList({
     editSnapshot,
     editType,
   ]);
+
+  const filteredAttributes = useMemo(() => {
+    const term = String(searchQuery || "")
+      .trim()
+      .toLowerCase();
+    if (!term) return attributes;
+
+    return attributes.filter((attribute) => {
+      const name = String(attribute.name || "").toLowerCase();
+      const type = String(attribute.type || "").toLowerCase();
+      return name.includes(term) || type.includes(term);
+    });
+  }, [attributes, searchQuery]);
 
   const openEditor = useCallback((attribute) => {
     if (!attribute) return;
@@ -105,7 +121,9 @@ export default function AttributeList({
 
     const payload = {
       name: String(editName || "").trim(),
-      type: String(editType || "").trim().toLowerCase(),
+      type: String(editType || "")
+        .trim()
+        .toLowerCase(),
       isRequired: Boolean(editIsRequired),
       options: editType === "select" ? normalizeOptions(editOptions) : [],
     };
@@ -122,7 +140,10 @@ export default function AttributeList({
 
     setIsSavingEdit(true);
     try {
-      const response = await api.patch(`/attributes/${activeAttribute.id}`, payload);
+      const response = await api.patch(
+        `/attributes/${activeAttribute.id}`,
+        payload,
+      );
       const updated = response.data?.data || null;
       if (updated?.id) {
         onAttributeUpdated?.(updated);
@@ -156,7 +177,9 @@ export default function AttributeList({
     setIsCheckingDependencies(true);
 
     try {
-      const response = await api.get(`/attributes/${attribute.id}/dependencies`);
+      const response = await api.get(
+        `/attributes/${attribute.id}/dependencies`,
+      );
       setDependencyInfo(buildDependencyInfo(response.data?.data || {}));
     } catch (error) {
       setDependencyInfo(buildDependencyInfo());
@@ -189,7 +212,6 @@ export default function AttributeList({
       setIsDeleteOpen(false);
       setActiveAttribute(null);
     } catch {
-      // parent handler already shows toast; keep modal open for user to read dependency info
     } finally {
       setIsDeleting(false);
     }
@@ -200,7 +222,7 @@ export default function AttributeList({
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.32, delay: 0.06 }}
-      className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-sm md:p-8"
+      className="flex h-[640px] max-h-[calc(100vh-220px)] flex-col rounded-4xl border border-slate-100 bg-white p-6 shadow-sm md:p-8"
     >
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <span className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-[#8b3dff]">
@@ -214,63 +236,91 @@ export default function AttributeList({
         </div>
       </div>
 
-      {attributes.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
-          No attributes yet. Create your first attribute to start mapping.
+      <div className="mb-6">
+        <label htmlFor="attribute-search" className="sr-only">
+          Search attributes
+        </label>
+        <div className="relative">
+          <Search
+            size={16}
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <input
+            id="attribute-search"
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search attributes by name or type"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-11 py-3 text-sm text-slate-900 outline-none transition focus:border-[#8b3dff] focus:ring-2 focus:ring-violet-100"
+          />
         </div>
-      ) : (
-        <div className="space-y-3">
-          {attributes.map((attribute) => {
-            const optionsCount = Array.isArray(attribute.options)
-              ? attribute.options.length
-              : 0;
+      </div>
 
-            return (
-              <article
-                key={attribute.id}
-                className="group rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 transition hover:border-violet-200 hover:bg-white"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">{attribute.name}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                      <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 font-medium text-slate-600">
-                        {formatType(attribute.type)}
-                      </span>
+      <div className="min-h-0 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+        {attributes.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
+            No attributes yet. Create your first attribute to start mapping.
+          </div>
+        ) : filteredAttributes.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
+            No attributes match your search.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredAttributes.map((attribute) => {
+              const optionsCount = Array.isArray(attribute.options)
+                ? attribute.options.length
+                : 0;
 
-                      {attribute.type === "select" ? (
-                        <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 font-medium text-[#8b3dff]">
-                          {optionsCount} options
+              return (
+                <article
+                  key={attribute.id}
+                  className="group rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 transition hover:border-violet-200 hover:bg-white"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        {attribute.name}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                        <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 font-medium text-slate-600">
+                          {formatType(attribute.type)}
                         </span>
-                      ) : null}
 
-                      <span
-                        className={`rounded-full border px-2 py-0.5 font-medium ${
-                          attribute.is_required
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border-slate-200 bg-white text-slate-500"
-                        }`}
-                      >
-                        {attribute.is_required ? "Required" : "Optional"}
-                      </span>
+                        {attribute.type === "select" ? (
+                          <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 font-medium text-[#8b3dff]">
+                            {optionsCount} options
+                          </span>
+                        ) : null}
 
-                      <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 font-medium text-slate-600">
-                        <Link2 size={11} />
-                        in use: {attribute.is_in_use ? "Yes" : "No"}
-                      </span>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 font-medium ${
+                            attribute.is_required
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : "border-slate-200 bg-white text-slate-500"
+                          }`}
+                        >
+                          {attribute.is_required ? "Required" : "Optional"}
+                        </span>
+
+                        <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 font-medium text-slate-600">
+                          <Link2 size={11} />
+                          in use: {attribute.is_in_use ? "Yes" : "No"}
+                        </span>
+                      </div>
                     </div>
-                  </div>
 
-                  <AttributeActionButtons
-                    onEdit={() => openEditor(attribute)}
-                    onDelete={() => openDelete(attribute)}
-                  />
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
+                    <AttributeActionButtons
+                      onEdit={() => openEditor(attribute)}
+                      onDelete={() => openDelete(attribute)}
+                    />
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <AttributeEditDrawer
         isOpen={isEditOpen}

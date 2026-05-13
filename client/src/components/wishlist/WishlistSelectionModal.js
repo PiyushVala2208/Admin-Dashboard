@@ -49,13 +49,18 @@ const normalizeVariantsForSelection = (
     const rawAttributes = Array.isArray(variant.variant_attributes)
       ? variant.variant_attributes
       : [];
+
     const normalizedAttributes = rawAttributes
       .map((entry) => {
         if (!entry || typeof entry !== "object") return null;
+
         const attributeId = Number(entry.attributeId ?? entry.attribute_id);
+
         const value = cleanString(entry.value || entry.attribute_value);
         if (!value) return null;
+
         const definitionName = attributeDefinitionMap.get(attributeId)?.name;
+
         const name = cleanString(
           entry.attributeName ||
             entry.attribute_name ||

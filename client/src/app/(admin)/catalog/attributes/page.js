@@ -179,8 +179,8 @@ export default function AttributesPage() {
           Loading attribute modules...
         </div>
       ) : (
-        <div className="grid gap-6 xl:grid-cols-[minmax(340px,420px)_minmax(0,1fr)]">
-          <div className="space-y-6">
+        <div className="grid gap-6 xl:grid-cols-[minmax(340px,420px)_minmax(0,1fr)] xl:items-stretch">
+          <div className="flex flex-col gap-6">
             <AttributeForm onCreated={handleAttributeCreated} />
             <AttributeList
               attributes={attributes}

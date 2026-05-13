@@ -1,6 +1,6 @@
 import Navbar from "@/components/shop/Navbar";
 import { CartProvider } from "@/context/CartContext";
-import { Toaster } from "react-hot-toast"; // 1. Import Toaster
+import { Toaster } from "react-hot-toast"; 
 
 export const metadata = {
   title: "D.SHOP | The Luxury Edit",

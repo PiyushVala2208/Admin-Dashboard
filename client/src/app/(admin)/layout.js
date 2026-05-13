@@ -23,9 +23,10 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <CategoryProvider>
-      <div className="flex h-screen overflow-hidden bg-slate-50">
+      <div className="flex h-screen w-full overflow-hidden bg-slate-50">
         <Sidebar />
-        <div className="flex flex-col flex-1 overflow-hidden">
+
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <Toaster
             position="top-right"
             toastOptions={{
@@ -38,7 +39,10 @@ export default function RootLayout({ children }) {
             }}
           />
           <Navbar />
-          <main className="flex-1 overflow-y-auto p-5">{children}</main>
+
+          <main className="flex-1 overflow-y-auto p-5 relative custom-scrollbar">
+            {children}
+          </main>
         </div>
       </div>
     </CategoryProvider>
