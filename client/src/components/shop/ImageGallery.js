@@ -27,30 +27,6 @@ function ImageGallery({
           }`}
         />
       </div>
-
-      {galleryImages.length > 1 ? (
-        <div className="flex gap-3 overflow-x-auto pb-1">
-          {galleryImages.map((image, index) => (
-            <button
-              key={`${image}-${index}`}
-              type="button"
-              onClick={() => onSelectImage(index)}
-              className={`relative h-18 w-16 shrink-0 overflow-hidden rounded-xl border ${
-                activeImageIndex === index
-                  ? "border-[#8b3dff]"
-                  : "border-slate-200"
-              }`}
-            >
-              <Image
-                src={image}
-                alt={`${productName} preview ${index + 1}`}
-                fill
-                className="object-cover"
-              />
-            </button>
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }
