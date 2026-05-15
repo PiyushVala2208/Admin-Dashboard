@@ -2,7 +2,6 @@
 
 import { memo } from "react";
 import { Minus, Plus } from "lucide-react";
-import { span } from "framer-motion/client";
 
 const isColorAttribute = (name = "") =>
   ["color", "colour"].includes(String(name).trim().toLowerCase());
@@ -39,6 +38,7 @@ function VariantPicker({
   selectedOptions,
   onOptionChange,
   isOutOfStock,
+  isSelectionComplete,
   selectedQuantity,
   onQuantityChange,
   displayStock,
@@ -104,7 +104,7 @@ function VariantPicker({
         </div>
       ) : null}
 
-      {!isOutOfStock ? (
+      {!isOutOfStock && isSelectionComplete ? (
         <div className="flex items-center gap-4 mb-6">
           <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
             Quantity

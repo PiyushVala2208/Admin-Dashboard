@@ -10,9 +10,110 @@ import ProductHeader from "@/components/shop/ProductHeader";
 import ProductGrid from "@/components/shop/ProductGrid";
 import {
   dispatchCartSync,
+  getWishlistItemKey,
   loadWishlist,
   saveWishlist,
 } from "@/app/utils/browserStorage";
+
+const COLOR_ATTRIBUTE_NAMES = new Set(["color", "colour"]);
+
+const cleanText = (value) => String(value || "").trim();
+
+const toNumber = (value, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const getVariantColor = (variant = {}) => {
+  const directColor = cleanText(variant.color || variant.variant_color);
+  if (directColor) return directColor;
+
+  const attributes = Array.isArray(variant.variant_attributes)
+    ? variant.variant_attributes
+    : [];
+  const colorAttribute = attributes.find((entry) => {
+    const normalizedName = cleanText(
+      entry?.attributeName || entry?.attribute_name || entry?.name,
+    ).toLowerCase();
+    return COLOR_ATTRIBUTE_NAMES.has(normalizedName);
+  });
+
+  return cleanText(colorAttribute?.value);
+};
+
+const pickColorRepresentatives = (variants = []) => {
+  const map = new Map();
+
+  variants.forEach((variant, index) => {
+    const color = getVariantColor(variant);
+    const key = color ? color.toLowerCase() : `__variant_${variant?.id || index}`;
+    const existing = map.get(key);
+
+    if (!existing) {
+      map.set(key, variant);
+      return;
+    }
+
+    if (variant?.is_default && !existing?.is_default) {
+      map.set(key, variant);
+    }
+  });
+
+  return Array.from(map.values());
+};
+
+const expandProductsToVariantCards = (products = []) =>
+  (Array.isArray(products) ? products : []).flatMap((product) => {
+    const variants = Array.isArray(product?.variants) ? product.variants : [];
+    if (variants.length === 0) {
+      return [{ ...product, card_key: `${product.id}-default` }];
+    }
+
+    const representativeVariants = pickColorRepresentatives(variants);
+    if (representativeVariants.length === 0) {
+      return [{ ...product, card_key: `${product.id}-default` }];
+    }
+
+    return representativeVariants.map((variant, index) => {
+      const variantColor = getVariantColor(variant) || cleanText(product.variant_color);
+      const variantImage =
+        cleanText(variant?.variant_image) ||
+        cleanText(variant?.image) ||
+        (Array.isArray(variant?.images)
+          ? cleanText(variant.images.find((entry) => cleanText(entry)))
+          : "") ||
+        cleanText(product.image) ||
+        cleanText(product.image_url);
+
+      return {
+        ...product,
+        card_key: `${product.id}-${variant?.id ?? `${variantColor || "variant"}-${index}`}`,
+        variant_id: variant?.id ?? null,
+        variant_color: variantColor || null,
+        variant_size: cleanText(variant?.size) || null,
+        variant_image: variantImage || null,
+        image: variantImage || product.image || product.image_url || null,
+        variant_price: toNumber(
+          variant?.variant_price ?? variant?.price,
+          toNumber(product.starting_from_price ?? product.price, 0),
+        ),
+        variant_stock: toNumber(
+          variant?.variant_stock ?? variant?.stock,
+          toNumber(product.stock, 0),
+        ),
+        price: toNumber(
+          variant?.variant_price ?? variant?.price,
+          toNumber(product.starting_from_price ?? product.price, 0),
+        ),
+        stock: toNumber(
+          variant?.variant_stock ?? variant?.stock,
+          toNumber(product.stock, 0),
+        ),
+        has_variants: false,
+        __variant_card: true,
+      };
+    });
+  });
 
 function ProductPageInner() {
   const searchParams = useSearchParams();
@@ -38,9 +139,16 @@ function ProductPageInner() {
   }, []);
 
   const buildWishlistItem = (product) => {
+    const variants = product.variants || [];
+    const isVariantCard = Boolean(product.__variant_card && product.variant_id);
     const fallbackVariant =
-      product.variants?.find((variant) => variant.is_default) ||
-      product.variants?.[0] ||
+      (isVariantCard
+        ? variants.find(
+            (variant) => String(variant?.id) === String(product.variant_id),
+          )
+        : null) ||
+      variants.find((variant) => variant.is_default) ||
+      variants[0] ||
       (product.variant_id ||
       product.variant_color ||
       product.variant_size ||
@@ -56,16 +164,20 @@ function ProductPageInner() {
         : null);
 
     const hasVariants = Boolean(
-      product.has_variants || (product.variants?.length || 0) > 1,
+      !isVariantCard &&
+        (product.has_variants || (product.variants?.length || 0) > 1),
     );
     const basePrice = Number(
-      fallbackVariant?.variant_price ?? product.price ?? 0,
+      product.variant_price ?? fallbackVariant?.variant_price ?? product.price ?? 0,
     );
     const baseStock = Number(
-      fallbackVariant?.variant_stock ?? product.stock ?? 0,
+      product.variant_stock ?? fallbackVariant?.variant_stock ?? product.stock ?? 0,
     );
     const baseImage =
-      fallbackVariant?.variant_image || product.image || product.image_url;
+      product.variant_image ||
+      fallbackVariant?.variant_image ||
+      product.image ||
+      product.image_url;
 
     return {
       id: product.id,
@@ -74,13 +186,13 @@ function ProductPageInner() {
       image: baseImage,
       price: basePrice,
       stock: baseStock,
-      variant_id: hasVariants ? null : fallbackVariant?.id || null,
+      variant_id: hasVariants ? null : product.variant_id || fallbackVariant?.id || null,
       selectedColor: hasVariants
         ? null
-        : fallbackVariant?.color || product.variant_color || null,
+        : product.variant_color || fallbackVariant?.color || null,
       selectedSize: hasVariants
         ? null
-        : fallbackVariant?.size || product.variant_size || null,
+        : product.variant_size || fallbackVariant?.size || null,
       has_variants: hasVariants,
       variant_price: basePrice,
       variant_stock: baseStock,
@@ -89,6 +201,7 @@ function ProductPageInner() {
       selectedAttributeCount: 0,
       variationAttributeCount: 0,
       isSelectionComplete: !hasVariants,
+      variants: variants
     };
   };
 
@@ -124,6 +237,50 @@ function ProductPageInner() {
     }
   }, [categoryFilter, categories]);
 
+  const hydrateProductsWithVariants = useCallback(async (items = []) => {
+    const safeItems = Array.isArray(items) ? items : [];
+    const needsHydration = safeItems.filter((item) => {
+      if (!item || item.id == null) return false;
+      const hasInlineVariants =
+        Array.isArray(item.variants) && item.variants.length > 0;
+      if (hasInlineVariants) return false;
+      return Boolean(item.has_variants || Number(item.variant_count || 0) > 0);
+    });
+
+    if (needsHydration.length === 0) {
+      return safeItems;
+    }
+
+    const detailResponses = await Promise.all(
+      needsHydration.map(async (item) => {
+        try {
+          const detailRes = await api.get(`/products/${item.id}`);
+          const detailProduct = detailRes?.data?.data || null;
+          const detailVariants = Array.isArray(detailProduct?.variants)
+            ? detailProduct.variants
+            : [];
+          return [String(item.id), detailVariants];
+        } catch {
+          return [String(item.id), []];
+        }
+      }),
+    );
+
+    const variantMap = new Map(detailResponses);
+    return safeItems.map((item) => {
+      const inlineVariants = Array.isArray(item.variants) ? item.variants : [];
+      if (inlineVariants.length > 0) {
+        return item;
+      }
+
+      const hydratedVariants = variantMap.get(String(item.id)) || [];
+      return {
+        ...item,
+        variants: hydratedVariants,
+      };
+    });
+  }, []);
+
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
@@ -153,13 +310,16 @@ function ProductPageInner() {
           sortBy,
           maxPrice: priceRange,
           search: searchQuery || undefined,
+          includeVariants: true,
         },
       });
 
       if (response.data.success) {
-        setProducts(
-          Array.isArray(response.data.data) ? response.data.data : [],
-        );
+        const rawProducts = Array.isArray(response.data.data)
+          ? response.data.data
+          : [];
+        const hydratedProducts = await hydrateProductsWithVariants(rawProducts);
+        setProducts(expandProductsToVariantCards(hydratedProducts));
         setTotalPages(Number(response.data.pagination?.totalPages || 1));
       }
     } catch (error) {
@@ -168,7 +328,15 @@ function ProductPageInner() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, selectedCategory, sortBy, priceRange, limit, searchQuery]);
+  }, [
+    currentPage,
+    selectedCategory,
+    sortBy,
+    priceRange,
+    limit,
+    searchQuery,
+    hydrateProductsWithVariants,
+  ]);
 
   useEffect(() => {
     const timeoutId = setTimeout(fetchProducts, 500);
@@ -191,14 +359,15 @@ function ProductPageInner() {
   const toggleWishlist = (product) => {
     const savedWishlist = loadWishlist();
     const wishlistItem = buildWishlistItem(product);
+    const wishlistKey = getWishlistItemKey(wishlistItem);
     const hasSameProduct = savedWishlist.some(
-      (item) => String(item.id) === String(product.id),
+      (item) => getWishlistItemKey(item) === wishlistKey,
     );
 
     let updatedWishlist;
     if (hasSameProduct) {
       updatedWishlist = savedWishlist.filter(
-        (item) => String(item.id) !== String(product.id),
+        (item) => getWishlistItemKey(item) !== wishlistKey,
       );
     } else {
       updatedWishlist = [...savedWishlist, wishlistItem];

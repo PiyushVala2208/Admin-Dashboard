@@ -133,18 +133,14 @@ export default function AddItemPage() {
 
   const filteredCategorySuggestions = useMemo(() => {
     const query = normalizeCategoryName(formData.categoryInput).toLowerCase();
-    if (!query) return [];
+    if (!query) return categories.slice(0, 8);
 
     return categories
       .filter((category) =>
         normalizeCategoryName(category.name).toLowerCase().includes(query),
       )
-      .slice(0, 5);
+      .slice(0, 8);
   }, [categories, formData.categoryInput]);
-
-  const hasCreatableCategory =
-    !exactCategoryMatch &&
-    normalizeCategoryName(formData.categoryInput).length > 0;
 
   useEffect(() => {
     if (
@@ -154,6 +150,7 @@ export default function AddItemPage() {
       setFormData((current) => ({
         ...current,
         categoryId: String(exactCategoryMatch.id),
+        categoryInput: exactCategoryMatch.name,
         isNewCategory: false,
       }));
     }
@@ -493,7 +490,7 @@ export default function AddItemPage() {
       ...current,
       categoryId: "",
       categoryInput: rawValue,
-      isNewCategory: true,
+      isNewCategory: false,
     }));
   };
 
@@ -504,17 +501,6 @@ export default function AddItemPage() {
       categoryId: String(category.id),
       categoryInput: category.name,
       isNewCategory: false,
-    }));
-  };
-
-  const handleCreateCategorySelection = () => {
-    const normalizedName = normalizeCategoryName(formData.categoryInput);
-    if (!normalizedName) return;
-    setFormData((current) => ({
-      ...current,
-      categoryId: "",
-      categoryInput: normalizedName,
-      isNewCategory: true,
     }));
   };
 
@@ -606,6 +592,8 @@ export default function AddItemPage() {
     if (!formData.name.trim()) return "Product name is required.";
     if (!normalizeCategoryName(formData.categoryInput))
       return "Category is required.";
+    if (!formData.categoryId)
+      return "Please select a valid category from suggestions.";
 
     for (const attribute of fixedSpecificationAttributes) {
       const value = normalizeSpecValue(specValues[attribute.id]);
@@ -831,12 +819,10 @@ export default function AddItemPage() {
                 loading={loading}
                 categories={categories}
                 filteredCategorySuggestions={filteredCategorySuggestions}
-                hasCreatableCategory={hasCreatableCategory}
                 exactCategoryMatch={exactCategoryMatch}
                 onFieldChange={handleFieldChange}
                 onCategoryInputChange={handleCategoryInputChange}
                 onChooseSuggestion={handleChooseSuggestion}
-                onCreateCategorySelection={handleCreateCategorySelection}
               />
             </aside>
 

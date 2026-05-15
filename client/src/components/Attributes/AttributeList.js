@@ -222,7 +222,7 @@ export default function AttributeList({
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.32, delay: 0.06 }}
-      className="flex h-[640px] max-h-[calc(100vh-220px)] flex-col rounded-4xl border border-slate-100 bg-white p-6 shadow-sm md:p-8"
+      className="flex h-160 max-h-[calc(200vh-220px)] flex-col rounded-4xl border border-slate-100 bg-white p-6 shadow-sm md:p-8"
     >
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <span className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-[#8b3dff]">

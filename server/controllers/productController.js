@@ -11,6 +11,9 @@ const productController = {
       const maxPrice = req.query.maxPrice || null;
       const sortBy = req.query.sortBy || "newest";
       const search = req.query.search || null;
+      const includeVariants =
+        String(req.query.includeVariants || "").trim().toLowerCase() ===
+        "true";
 
       const offset = (page - 1) * limit;
 
@@ -22,6 +25,7 @@ const productController = {
         limit,
         offset,
         search,
+        includeVariants,
       });
 
       const totalItems = await Product.getTotalCount({

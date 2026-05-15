@@ -155,7 +155,7 @@ export default function AttributeMapping({ categories = [], attributes = [] }) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.36, delay: 0.04 }}
-      className="flex h-full min-h-[640px] flex-col rounded-[2rem] border border-slate-100 bg-white p-6 shadow-sm md:p-8"
+      className="flex h-full min-h-160 max-h-[calc(200vh-220px)] flex-col rounded-4xl border border-slate-100 bg-white p-6 shadow-sm md:p-8"
     >
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <span className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-[#8b3dff]">
@@ -279,35 +279,9 @@ export default function AttributeMapping({ categories = [], attributes = [] }) {
                             className="mt-3 rounded-2xl border border-white/25 bg-white/10 p-3"
                             onClick={(event) => event.stopPropagation()}
                           >
-                            <div className="mb-3 flex items-center justify-between gap-3">
-                              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-100">
-                                Required
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateMeta(attributeId, {
-                                    is_required: !meta.is_required,
-                                  })
-                                }
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
-                                  meta.is_required
-                                    ? "bg-white"
-                                    : "bg-violet-300"
-                                }`}
-                              >
-                                <span
-                                  className={`inline-block h-4 w-4 transform rounded-full bg-[#8b3dff] transition ${
-                                    meta.is_required
-                                      ? "translate-x-6"
-                                      : "translate-x-1"
-                                  }`}
-                                />
-                              </button>
-                            </div>
 
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-100">
+                            <div className="space-y-1.5 flex gap-5">
+                              <label className="text-xs font-semibold  text-violet-100">
                                 Sort Order
                               </label>
                               <input

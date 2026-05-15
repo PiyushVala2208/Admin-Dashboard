@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react";
 import ProductCard from "./ProductCard";
+import { getWishlistItemKey } from "@/app/utils/browserStorage";
 
 export default function ProductGrid({
   products,
@@ -27,16 +28,28 @@ export default function ProductGrid({
         } grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4`}
       >
         {products.length > 0
-          ? products.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                isInWishlist={wishlist.some(
-                  (item) => String(item.id) === String(product.id),
-                )}
-                toggleWishlist={toggleWishlist}
-              />
-            ))
+          ? products.map((product) => {
+              const productWishlistKey = getWishlistItemKey({
+                id: product.id,
+                variant_id: product.variant_id ?? null,
+                selectedColor: product.variant_color || null,
+                selectedSize: product.variant_size || null,
+              });
+
+              return (
+                <ProductCard
+                  key={
+                    product.card_key ||
+                    `${product.id}-${product.variant_id || "default"}`
+                  }
+                  product={product}
+                  isInWishlist={wishlist.some(
+                    (item) => getWishlistItemKey(item) === productWishlistKey,
+                  )}
+                  toggleWishlist={toggleWishlist}
+                />
+              );
+            })
           : !loading && (
               <div className="col-span-full flex flex-col items-center justify-center py-32 border-2 border-dashed border-[#DDD6FE] rounded-[2.5rem] bg-[#F5F3FF]/30">
                 <p className="font-serif italic text-xl text-[#4C1D95]/40 mb-2">

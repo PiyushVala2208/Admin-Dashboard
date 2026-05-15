@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Ban,
@@ -70,10 +70,24 @@ const findMatchingVariant = (
   variants,
   selectedOptions,
   variationAttributes,
+  preferredVariantId = null,
 ) => {
   if (!Array.isArray(variants) || variants.length === 0) return null;
+
+  const preferredVariant =
+    preferredVariantId == null
+      ? null
+      : variants.find(
+          (variant) =>
+            String(variant?.id ?? "") === String(preferredVariantId),
+        ) || null;
+
   if (!Array.isArray(variationAttributes) || variationAttributes.length === 0) {
-    return variants.find((variant) => variant.is_default) || variants[0];
+    return (
+      preferredVariant ||
+      variants.find((variant) => variant.is_default) ||
+      variants[0]
+    );
   }
 
   const fullySelected = variationAttributes.every(
@@ -94,9 +108,20 @@ const findMatchingVariant = (
       return map.get(attribute.attributeId) === selectedValue;
     });
   });
+  const preferredMatch =
+    preferredVariant == null
+      ? null
+      : matches.find(
+          (variant) =>
+            String(variant?.id ?? "") === String(preferredVariantId),
+        ) || null;
 
   if (fullySelected) {
-    return matches[0] || null;
+    return matches[0] || preferredMatch || null;
+  }
+
+  if (preferredMatch) {
+    return preferredMatch;
   }
 
   return (
@@ -107,9 +132,32 @@ const findMatchingVariant = (
   );
 };
 
+const getMatchingVariants = (variants, selectedOptions, variationAttributes) => {
+  if (!Array.isArray(variants) || variants.length === 0) return [];
+  if (!Array.isArray(variationAttributes) || variationAttributes.length === 0) {
+    return variants;
+  }
+
+  return variants.filter((variant) => {
+    const map = new Map(
+      (variant.variant_attributes || []).map((entry) => [
+        Number(entry.attributeId ?? entry.attribute_id),
+        String(entry.value || "").trim(),
+      ]),
+    );
+
+    return variationAttributes.every((attribute) => {
+      const selectedValue = selectedOptions[attribute.attributeId];
+      if (!selectedValue) return true;
+      return map.get(attribute.attributeId) === selectedValue;
+    });
+  });
+};
+
 export default function ProductDetailsPage() {
   const { id } = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -118,6 +166,11 @@ export default function ProductDetailsPage() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [isAddedToCart, setIsAddedToCart] = useState(false);
+
+  const preferredVariantId = useMemo(() => {
+    const rawVariant = String(searchParams.get("variant") || "").trim();
+    return rawVariant || null;
+  }, [searchParams]);
 
   useEffect(() => {
     if (!id) return;
@@ -179,6 +232,15 @@ export default function ProductDetailsPage() {
     [attributeDefinitionMap, normalizedVariants],
   );
 
+  const preferredVariant = useMemo(() => {
+    if (!preferredVariantId) return null;
+    return (
+      normalizedVariants.find(
+        (variant) => String(variant?.id ?? "") === String(preferredVariantId),
+      ) || null
+    );
+  }, [normalizedVariants, preferredVariantId]);
+
   const optionAvailability = useMemo(() => {
     const availability = {};
     variationAttributes.forEach((attribute) => {
@@ -231,6 +293,7 @@ export default function ProductDetailsPage() {
     }
 
     const defaultVariant =
+      preferredVariant ||
       normalizedVariants.find((variant) => variant.is_default) ||
       normalizedVariants[0];
 
@@ -248,7 +311,7 @@ export default function ProductDetailsPage() {
     });
 
     setSelectedOptions(nextOptions);
-  }, [product, normalizedVariants, variationAttributes]);
+  }, [product, normalizedVariants, preferredVariant, variationAttributes]);
 
   const activeVariant = useMemo(
     () =>
@@ -256,34 +319,78 @@ export default function ProductDetailsPage() {
         normalizedVariants,
         selectedOptions,
         variationAttributes,
+        preferredVariantId,
+      ),
+    [normalizedVariants, preferredVariantId, selectedOptions, variationAttributes],
+  );
+
+  const isSelectionComplete = useMemo(
+    () =>
+      variationAttributes.length === 0 ||
+      variationAttributes.every(
+        (attribute) => Boolean(selectedOptions[attribute.attributeId]),
+      ),
+    [selectedOptions, variationAttributes],
+  );
+
+  const matchingVariants = useMemo(
+    () =>
+      getMatchingVariants(
+        normalizedVariants,
+        selectedOptions,
+        variationAttributes,
       ),
     [normalizedVariants, selectedOptions, variationAttributes],
   );
 
+  const variantSpecificStock = Number(activeVariant?.stock ?? 0);
+  const aggregateMatchingStock = matchingVariants.reduce(
+    (sum, variant) => sum + Math.max(0, Number(variant?.stock ?? 0)),
+    0,
+  );
   const displayPrice = Number(
     activeVariant?.price ?? product?.starting_from_price ?? product?.price ?? 0,
   );
-  const displayStock = Number(activeVariant?.stock ?? product?.stock ?? 0);
+  const displayStock = Number(
+    variationAttributes.length > 0
+      ? isSelectionComplete
+        ? variantSpecificStock
+        : aggregateMatchingStock
+      : activeVariant?.stock ?? product?.stock ?? 0,
+  );
   const isOutOfStock = displayStock <= 0;
-  const isLowStock = displayStock > 0 && displayStock <= 5;
+  const showVariantLowStock = isSelectionComplete && variationAttributes.length > 0;
+  const isLowStock =
+    showVariantLowStock &&
+    variantSpecificStock > 0 &&
+    variantSpecificStock <= 5;
 
   const galleryImages = useMemo(() => {
-    const variantImages = Array.isArray(activeVariant?.images)
-      ? activeVariant.images
-      : [];
-    const fallbackList = [
-      activeVariant?.variant_image,
-      product?.image,
-      product?.image_url,
-    ]
-      .map((entry) => String(entry || "").trim())
-      .filter(Boolean);
+    const normalizeList = (list = []) =>
+      list.map((entry) => String(entry || "").trim()).filter(Boolean);
 
-    const merged = [...new Set([...variantImages, ...fallbackList])];
+    const activeVariantImages = normalizeList([
+      ...(Array.isArray(activeVariant?.images) ? activeVariant.images : []),
+      activeVariant?.variant_image,
+    ]);
+
+    const allVariantImages = normalizedVariants.flatMap((variant) =>
+      normalizeList([
+        ...(Array.isArray(variant?.images) ? variant.images : []),
+        variant?.variant_image,
+      ]),
+    );
+
+    const fallbackList = normalizeList([product?.image, product?.image_url]);
+
+    const merged = [
+      ...new Set([...activeVariantImages, ...allVariantImages, ...fallbackList]),
+    ];
     return merged.length > 0 ? merged : [getFallbackImage()];
   }, [
     activeVariant?.images,
     activeVariant?.variant_image,
+    normalizedVariants,
     product?.image,
     product?.image_url,
   ]);
@@ -334,6 +441,11 @@ export default function ProductDetailsPage() {
 
   const handleAddToCart = () => {
     if (!product || isOutOfStock) return;
+
+    if (!isSelectionComplete) {
+      toast.error("Please select all required options first.");
+      return;
+    }
 
     const itemKey = getCartItemKey({
       id: product.id,
@@ -424,7 +536,7 @@ export default function ProductDetailsPage() {
       .filter(Boolean);
     const variationAttributeCount = variationAttributes.length;
     const selectedAttributeCount = selectedAttributes.length;
-    const isSelectionComplete =
+    const isWishlistSelectionComplete =
       variationAttributeCount === 0 ||
       selectedAttributeCount >= variationAttributeCount;
     const wishlistEntry = {
@@ -434,7 +546,7 @@ export default function ProductDetailsPage() {
       image: galleryImages[0],
       price: displayPrice,
       stock: displayStock,
-      variant_id: isSelectionComplete ? activeVariant?.id || null : null,
+      variant_id: isWishlistSelectionComplete ? activeVariant?.id || null : null,
       selectedColor:
         selectedOptions[
           variationAttributes.find((attribute) =>
@@ -455,7 +567,7 @@ export default function ProductDetailsPage() {
       selectedAttributes,
       selectedAttributeCount,
       variationAttributeCount,
-      isSelectionComplete,
+      isSelectionComplete: isWishlistSelectionComplete,
     };
 
     const targetKey = getWishlistItemKey(wishlistEntry);
@@ -541,22 +653,13 @@ export default function ProductDetailsPage() {
               {product.name}
             </h1>
 
-            <div className="mb-5 flex items-center gap-3">
-              <div className="flex items-center rounded-full border border-green-100 bg-green-50 px-2.5 py-0.5 text-[10px] font-bold text-green-700">
-                4.5 <Star size={10} className="ml-1 fill-green-700" />
-              </div>
-              <span className="border-l border-slate-200 pl-3 text-[10px] font-medium uppercase tracking-widest text-slate-400">
-                1.2k Ratings
+            {isLowStock ? (
+              <span className="animate-pulse rounded-full border border-orange-100 bg-orange-50 px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-orange-600">
+                Only {variantSpecificStock} left in stock
               </span>
+            ) : null}
 
-              {isLowStock ? (
-                <span className="ml-auto animate-pulse rounded-full border border-orange-100 bg-orange-50 px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-orange-600">
-                  Only {displayStock} left in stock
-                </span>
-              ) : null}
-            </div>
-
-            <div className="mb-6 flex items-baseline gap-3">
+            <div className="mb-6 mt-3 flex items-baseline gap-3">
               <span
                 className={`text-2xl font-black tracking-tight ${
                   isOutOfStock ? "text-slate-400" : "text-slate-900"
@@ -571,6 +674,7 @@ export default function ProductDetailsPage() {
               selectedOptions={selectedOptions}
               onOptionChange={handleOptionChange}
               isOutOfStock={isOutOfStock}
+              isSelectionComplete={isSelectionComplete}
               selectedQuantity={selectedQuantity}
               onQuantityChange={setSelectedQuantity}
               displayStock={displayStock}
@@ -581,9 +685,9 @@ export default function ProductDetailsPage() {
           <div className="mb-8 flex flex-col gap-3 sm:flex-row">
             <button
               onClick={handleAddToCart}
-              disabled={isOutOfStock}
+              disabled={isOutOfStock || !isSelectionComplete}
               className={`flex flex-[2] items-center justify-center gap-2.5 rounded-xl py-4 text-[11px] font-black uppercase tracking-widest shadow-lg transition-all ${
-                isOutOfStock
+                isOutOfStock || !isSelectionComplete
                   ? "cursor-not-allowed bg-slate-100 text-slate-400"
                   : isAddedToCart
                     ? "bg-green-600 text-white"
@@ -593,6 +697,10 @@ export default function ProductDetailsPage() {
               {isOutOfStock ? (
                 <>
                   <Ban size={16} /> Sold Out
+                </>
+              ) : !isSelectionComplete ? (
+                <>
+                  <Ban size={16} /> Select Options
                 </>
               ) : isAddedToCart ? (
                 <>
