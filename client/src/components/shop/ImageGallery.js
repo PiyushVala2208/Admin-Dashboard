@@ -6,9 +6,6 @@ import Image from "next/image";
 function ImageGallery({
   productName,
   displayImage,
-  galleryImages,
-  activeImageIndex,
-  onSelectImage,
   isOutOfStock,
   fallbackImage,
 }) {
@@ -26,6 +23,13 @@ function ImageGallery({
             isOutOfStock ? "grayscale opacity-70" : "hover:scale-105"
           }`}
         />
+        {isOutOfStock ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/15 backdrop-blur-[1px]">
+            <span className="rounded-full border border-white/25 bg-black/65 px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white">
+              Not Available
+            </span>
+          </div>
+        ) : null}
       </div>
     </div>
   );

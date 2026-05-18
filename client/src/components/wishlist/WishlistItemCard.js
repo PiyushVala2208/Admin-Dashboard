@@ -13,19 +13,38 @@ function WishlistItemCard({
   onMoveToCart,
   onRemove,
 }) {
+  const normalizeText = (value) => String(value || "").trim();
+  const isGenericAttributeName = (name = "") =>
+    /^attribute\s+\d+$/i.test(normalizeText(name));
+
   const selectedAttributes = Array.isArray(item.selectedAttributes)
     ? item.selectedAttributes
     : [];
-  const filteredAttributes = selectedAttributes.filter(
-    (attribute) => !/color|colour/i.test(attribute.name || ""),
-  );
-  const selectionText = filteredAttributes.length
-    ? filteredAttributes
-        .map((attribute) => `${attribute.name}: ${attribute.value}`)
-        .join(" | ")
-    : item.selectedSize
-      ? `Size: ${item.selectedSize}`
-      : null;
+
+  const filteredAttributes = selectedAttributes
+    .map((attribute) => {
+      const name = normalizeText(attribute?.name);
+      const value = normalizeText(attribute?.value);
+      if (!value) return null;
+      if (/color|colour/i.test(name)) return null;
+
+      if (isGenericAttributeName(name)) {
+        if (normalizeText(item.selectedSize).toLowerCase() === value.toLowerCase()) {
+          return `Size: ${value}`;
+        }
+        return value;
+      }
+
+      return `${name}: ${value}`;
+    })
+    .filter(Boolean);
+
+  const selectionText =
+    filteredAttributes.length > 0
+      ? filteredAttributes.join(" | ")
+      : item.selectedSize
+        ? `Size: ${item.selectedSize}`
+        : null;
 
   return (
     <div className="bg-white rounded-4xl overflow-hidden border border-slate-200/60 shadow-sm hover:shadow-xl hover:shadow-purple-100/50 transition-all duration-500 group relative flex flex-col">

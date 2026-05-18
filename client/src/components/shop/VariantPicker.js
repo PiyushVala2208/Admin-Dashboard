@@ -65,24 +65,21 @@ function VariantPicker({
                       ? optionAvailability[attribute.attributeId][option] !==
                         false
                       : true;
-                    const isDisabled = !isAvailable;
+                    const isUnavailable = !isAvailable;
                     return (
                       <button
                         key={`${attribute.attributeId}-${option}`}
                         type="button"
                         onClick={() =>
-                          isDisabled
-                            ? null
-                            : onOptionChange(attribute.attributeId, option)
+                          onOptionChange(attribute.attributeId, option)
                         }
-                        aria-disabled={isDisabled}
                         className={`relative inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-bold uppercase tracking-wide transition-all ${
                           isSelected
                             ? "border-[#8b3dff] bg-violet-50 text-[#8b3dff]"
                             : "border-slate-200 bg-white text-slate-600 hover:border-violet-200"
                         } ${
-                          isDisabled
-                            ? "cursor-not-allowed opacity-60 grayscale"
+                          isUnavailable
+                            ? "opacity-60 grayscale"
                             : ""
                         }`}
                       >

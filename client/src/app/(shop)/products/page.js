@@ -163,10 +163,61 @@ function ProductPageInner() {
           }
         : null);
 
+    const variationAttributesMap = new Map();
+    variants.forEach((variant) => {
+      (Array.isArray(variant?.variant_attributes)
+        ? variant.variant_attributes
+        : []
+      ).forEach((entry) => {
+        const attributeId = Number(entry?.attributeId ?? entry?.attribute_id);
+        if (!Number.isInteger(attributeId) || attributeId <= 0) return;
+
+        const fallbackName = COLOR_ATTRIBUTE_NAMES.has(
+          cleanText(entry?.attributeName || entry?.attribute_name || entry?.name)
+            .toLowerCase(),
+        )
+          ? "Color"
+          : `Attribute ${attributeId}`;
+
+        const attributeName =
+          cleanText(entry?.attributeName || entry?.attribute_name || entry?.name) ||
+          fallbackName;
+
+        variationAttributesMap.set(attributeId, attributeName);
+      });
+    });
+
+    const variationAttributeCount =
+      variationAttributesMap.size > 0
+        ? variationAttributesMap.size
+        : variants.length > 1
+          ? 2
+          : 0;
+
     const hasVariants = Boolean(
-      !isVariantCard &&
-        (product.has_variants || (product.variants?.length || 0) > 1),
+      variationAttributeCount > 0 ||
+        product.has_variants ||
+        (product.variants?.length || 0) > 1,
     );
+
+    const variantCardSelectedAttributes =
+      isVariantCard && product.variant_color
+        ? [
+            {
+              attributeId: -1,
+              name: "Color",
+              value: product.variant_color,
+            },
+          ]
+        : [];
+
+    const selectedAttributes = hasVariants ? variantCardSelectedAttributes : [];
+    const selectedAttributeCount = selectedAttributes.length;
+    const isSelectionComplete = hasVariants
+      ? variationAttributeCount > 0 &&
+        selectedAttributeCount >= variationAttributeCount
+      : true;
+
     const basePrice = Number(
       product.variant_price ?? fallbackVariant?.variant_price ?? product.price ?? 0,
     );
@@ -186,10 +237,12 @@ function ProductPageInner() {
       image: baseImage,
       price: basePrice,
       stock: baseStock,
-      variant_id: hasVariants ? null : product.variant_id || fallbackVariant?.id || null,
+      variant_id: isSelectionComplete
+        ? product.variant_id || fallbackVariant?.id || null
+        : null,
       selectedColor: hasVariants
-        ? null
-        : product.variant_color || fallbackVariant?.color || null,
+        ? product.variant_color || fallbackVariant?.color || null
+        : null,
       selectedSize: hasVariants
         ? null
         : product.variant_size || fallbackVariant?.size || null,
@@ -197,10 +250,10 @@ function ProductPageInner() {
       variant_price: basePrice,
       variant_stock: baseStock,
       variant_image: baseImage,
-      selectedAttributes: [],
-      selectedAttributeCount: 0,
-      variationAttributeCount: 0,
-      isSelectionComplete: !hasVariants,
+      selectedAttributes,
+      selectedAttributeCount,
+      variationAttributeCount,
+      isSelectionComplete,
       variants: variants
     };
   };

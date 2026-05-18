@@ -97,8 +97,10 @@ export default function WishlistPage() {
     const variationCount = Number(item.variationAttributeCount ?? 0);
     const selectedCount = Number(item.selectedAttributeCount ?? 0);
     const isSelectionComplete =
-      item.variant_id != null ||
-      (variationCount > 0 && selectedCount >= variationCount);
+      item.isSelectionComplete === true ||
+      (variationCount > 0
+        ? selectedCount >= variationCount
+        : item.variant_id != null || !item.has_variants);
     const needsSelection = Boolean(item.has_variants && !isSelectionComplete);
     if (needsSelection) {
       toast("Please select the remaining options to continue.", {
@@ -253,8 +255,9 @@ export default function WishlistPage() {
               const selectedCount = Number(item.selectedAttributeCount ?? 0);
               const isSelectionComplete =
                 item.isSelectionComplete === true ||
-                item.variant_id != null ||
-                (variationCount > 0 && selectedCount >= variationCount);
+                (variationCount > 0
+                  ? selectedCount >= variationCount
+                  : item.variant_id != null || !item.has_variants);
               const needsSelection = Boolean(
                 item.has_variants && !isSelectionComplete,
               );
